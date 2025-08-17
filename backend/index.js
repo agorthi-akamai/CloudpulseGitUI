@@ -36,61 +36,73 @@ const execAsync = util.promisify(exec);
 
 const MAX_EXEC_BUFFER = 10 * 1024 * 1024; // 10MB
 
-const REACT_ENVS = {
-  prod: {
-    REACT_APP_LOGIN_ROOT: 'https://login.linode.com',
-    REACT_APP_API_ROOT: 'https://api.linode.com/v4',
-    REACT_APP_CLIENT_ID: '2a772aebc1f156e412e7',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '703354058b618e2fdb797bc8af1188f92dd0f058a436d17c35bc2a34ed2a3426',
-  },
-  alpha: {
-    REACT_APP_LOGIN_ROOT: 'https://login.dev.linode.com',
-    REACT_APP_API_ROOT: 'https://api.dev.linode.com/v4',
-    REACT_APP_CLIENT_ID: 'aa6136824c81ccc56672',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '9c956852ea96954acbad105b850caf2338dce03600126c5496ddb477be58ebc0',
-  },
-  devCloud: {
-    REACT_APP_LOGIN_ROOT: 'https://login.devcloud.linode.com',
-    REACT_APP_API_ROOT: 'https://api.devcloud.linode.com/v4',
-    REACT_APP_CLIENT_ID: '381cd97ee70b87235d90',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '955ebd71b0afcd363e1f1c1a1aa76569d4d72dd247cc12ae5c29a94c01866ef9',
-  },
-  staging: {
-    REACT_APP_LOGIN_ROOT: 'https://login.staging.linode.com',
-    REACT_APP_API_ROOT: 'https://api.staging.linode.com/v4',
-    REACT_APP_CLIENT_ID: 'b4b43a1c26278f2c15cd',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: 'b082b2eacf82592994c66fab256f28a02d2ccfd74a65b3ed6182f28320e94d1e',
-  }
-};
-
 // Express app
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+app.get('/env', async (req, res) => {
+  try {
+    const env = (req.query.env || 'prod').toLowerCase();
+
+    // getEnvConfig returns full config from env vars or source
+    const config = getEnvConfig(env);
+
+    // Write full config content to all required .env files
+    const contents = formatEnv(config);
+    const destinations = [
+      { dir: repoPath, file: path.join(repoPath, '.env') },
+      { dir: path.join(repoPath, 'packages', 'manager'), file: path.join(repoPath, 'packages', 'manager', '.env') },
+      { dir: localPackagesEnvDir, file: localPackagesEnvFile },
+    ];
+    for (const dest of destinations) {
+      if (!fs.existsSync(dest.dir)) fs.mkdirSync(dest.dir, { recursive: true });
+      if (fs.existsSync(dest.file)) fs.unlinkSync(dest.file);
+      fs.writeFileSync(dest.file, contents, 'utf8');
+    }
+
+    // Create a shallow copy and mask MANAGER_OAUTH before responding
+    const maskedConfig = { ...config };
+    if (maskedConfig.MANAGER_OAUTH) maskedConfig.MANAGER_OAUTH = 'XXX';
+
+    // Return masked config in JSON response only
+    res.json({
+      success: true,
+      message: `Env config for '${env}' written`,
+      config: maskedConfig,
+    });
+  } catch (err) {
+    console.error('/env error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+const getEnvConfig = (envKey) => {
+  try {
+    const raw = process.env[`CONFIG_${envKey.toUpperCase()}`];
+    if (!raw) throw new Error(`No config found for env: ${envKey}`);
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error(`Failed to parse env config for ${envKey}: ${e.message}`);
+  }
+};
+
+
+
 // Utilities
-function formatEnv(config) {
+const formatEnv = (config) => {
   return Object.entries(config)
     .map(([key, value]) => {
       if (typeof value === 'string') {
         value = value.trim().replace(/%$/, ''); // Trim and drop trailing %
+        return `${key}='${value}'`;
       }
-      return `${key}='${value}'`;
+      return `${key}=${value}`;
     })
     .join('\n');
-}
+};
+
 
 function replacePlaceholders(template, values) {
   return template.replace(/{{(.*?)}}/g, (_, key) => values[key] || '');
