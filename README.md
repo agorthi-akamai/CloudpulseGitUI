@@ -122,9 +122,3 @@ cd frontend && pnpm dev        # Starts React frontend (UI)
 ***
 
 This project saves time on everyday Git operations and lets your entire team manage code branches, environments, and automations with confidence—all from the browser.
-
-[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84228229/77823e9a-6074-4031-ac50-368beed12ce7/App.js
-[2] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84228229/e2d7fafb-a909-4c77-b1ea-f9332c02b430/index.js
-[3] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84228229/360fd219-c301-4d9f-9549-d2a68e961d2e/install.md
-[4] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84228229/1046125e-5ff8-4e80-b7b8-68f7eb5cfecb/setup.sh
-[5] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/84228229/316254e6-7a24-4208-813c-e0829e957f80/Screenshot-2025-08-17-at-1.27.21-PM.jpg
