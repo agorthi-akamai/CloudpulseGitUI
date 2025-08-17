@@ -1,3 +1,9 @@
+### Installation Guide
+
+We have included a `setup.sh` script to help you install all dependencies easily.
+
+Before running the script, please give it execution permissions:( chmod +x setup.sh)
+
 # Installation Guide
 
 | Step | Directory         | Command                                                                                      | Notes                                                                 |
