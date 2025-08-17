@@ -14,4 +14,3 @@ node_modules/
 Thumbs.db
 *.env
 
- backend/pnpm-lock.yaml
