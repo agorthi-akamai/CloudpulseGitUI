@@ -3,7 +3,7 @@
     "@mui/x-data-grid-pro": "^8.9.2"
   },
   "devDependencies": {
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "prettier": "3.6.2"
   }
 }

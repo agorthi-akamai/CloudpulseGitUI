@@ -200,25 +200,30 @@ let specsRefreshing = false;
 const BRANCH_CACHE_TTL = 30 * 1000; // 30s
 const SPECS_CACHE_TTL = 60 * 1000; // 60s
 
+
 async function refreshBranchesCache() {
   if (branchesRefreshing) return; // already running
   branchesRefreshing = true;
   try {
     // Get all branch names
-    const { stdout: branchNamesOut } = await execGit(`git for-each-ref --format="%(refname:short)" refs/heads`, repoPath);
+    const { stdout: branchNamesOut } = await execGit(
+      `git for-each-ref --format="%(refname:short)" refs/heads`,
+      repoPath
+    );
     const names = branchNamesOut.trim().split('\n').map(s => s.trim()).filter(Boolean);
-
-    const remotes = await getRemotesAsync();
 
     const results = [];
 
     for (const name of names) {
       try {
         // createdAt: first commit date (ISO)
-        const { stdout: createdAtRaw } = await execGit(`git log --reverse --format="%aI" ${name} | head -1`, repoPath);
+        const { stdout: createdAtRaw } = await execGit(
+          `git log --reverse --format="%aI" ${name} | head -1`,
+          repoPath
+        );
         const createdAt = parseGitDateISO(createdAtRaw.trim());
 
-        // reflog line: grab one that mentions "branch: Created from" if present
+        // reflog line
         let reflogDate = '';
         try {
           const { stdout: reflogOut } = await execGit(
@@ -228,11 +233,9 @@ async function refreshBranchesCache() {
           const match = reflogOut.trim();
           const parsed = parseGitReflogDate(match);
           reflogDate = parsed ? parseGitDateISO(parsed.toISOString()) : '';
-        } catch (_) {
-          reflogDate = '';
-        }
+        } catch (_) {}
 
-        // try to determine upstream/tracking
+        // determine upstream/tracking
         let createdFrom = '';
         try {
           const { stdout: up } = await execGit(
@@ -240,34 +243,48 @@ async function refreshBranchesCache() {
             repoPath
           );
           createdFrom = (up || '').trim();
-        } catch (_) {
-          createdFrom = '';
-        }
+        } catch (_) {}
         if (!createdFrom) {
           createdFrom = extractCreatedFromFromName(name);
         }
+
+        // get first bug ticket for this branch
+        let bugTicket = "No ticket avalible";
+        try {
+          // Use git log to find the first commit message containing a ticket ID
+          const { stdout: ticketOut } = await execGit(
+            `git log ${name} --pretty=%B | grep -oE 'DI-[0-9]+' | head -1`,
+            repoPath
+          );
+          if (ticketOut && ticketOut.trim()) {
+            bugTicket = ticketOut.trim();
+          }
+        } catch (_) {}
 
         results.push({
           name,
           createdAt: createdAt || '',
           date: reflogDate || '',
-          createdFrom
+          createdFrom,
+          bugTicket
         });
       } catch (err) {
-        console.error(`Error processing branch ${name}:`, (err && err.message) || err);
-        results.push({ name, createdAt: '', date: '', createdFrom: '' });
+        console.error(`Error processing branch ${name}:`, err.message || err);
+        results.push({ name, createdAt: '', date: '', createdFrom: '', bugTicket: "No ticket avalible" });
       }
     }
 
     cachedBranches = results;
     branchesCacheTS = Date.now();
-    // console.log(`[cache] branches updated: ${cachedBranches.length}`);
   } catch (err) {
     console.error('refreshBranchesCache error:', err.message || err);
   } finally {
     branchesRefreshing = false;
   }
 }
+
+
+
 
 async function refreshSpecsCache() {
   if (specsRefreshing) return;
@@ -348,23 +365,31 @@ app.get('/getlog', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid repository path or not a Git repository' });
     }
 
-    const cmd = `git -C "${repoPath}" log -n 3 --no-merges --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s"`;
+    // git log command to get last 3 commits with formatted output
+    const cmd = `git -C "${repoPath}" log -n 3  --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s"`;
     const { stdout } = await execAsync(cmd);
 
     if (!stdout.trim()) {
       return res.status(404).json({ success: false, error: 'No commits found in repository' });
     }
 
+    // Regex to find JIRA ticket style IDs in commit messages
+    const ticketRegex = /DI-[0-9]+/g;
+
     const commits = stdout
       .trim()
       .split('\n')
       .map(line => {
         const [hash, author, date, ...messageParts] = line.split('|');
+        const message = messageParts.join('|').trim();
+        // Extract all ticket IDs matching the pattern
+        const tickets = message.match(ticketRegex) || [];
         return {
           commit: hash,
           author: author,
           date: date,
-          message: messageParts.join('|').trim(),
+          message: message,
+          tickets: tickets  // array of found ticket IDs, empty if none
         };
       });
 
@@ -662,12 +687,12 @@ app.post('/pull-and-pnpm', async (req, res) => {
     if (remote_branch_info) {
       try {
         const { stdout } = await execGit(`git pull ${shellEscapeArg(remote_name)} ${shellEscapeArg(branch_name)}`, repoPath);
-        pullResult = stdout.trim();
+        pullResult ='Pulled Successfully';
     
         // If there were changes (not just "Already up to date.")
         if (!pullResult.includes('Already up to date')) {
           const { stdout: diffStdout } = await execGit('git diff --name-only HEAD@{1} HEAD', repoPath);
-          // updatedFiles = diffStdout.split('\n').filter(Boolean); // filter out empty lines
+            updatedFiles = diffStdout.split('\n').filter(Boolean); // filter out empty lines
         }
       } catch (e) {
         errorMsg = e.message || e;
@@ -694,8 +719,8 @@ app.post('/pull-and-pnpm', async (req, res) => {
       remote_branch_info,
       remote_name,
       branch_name,
+      updatedFiles,
       message: errorMsg || pullResult || 'No output from git pull',
-      git_branch_vv: branchesStdout
     });
     
   } catch (err) {
