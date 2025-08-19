@@ -36,61 +36,73 @@ const execAsync = util.promisify(exec);
 
 const MAX_EXEC_BUFFER = 10 * 1024 * 1024; // 10MB
 
-const REACT_ENVS = {
-  prod: {
-    REACT_APP_LOGIN_ROOT: 'https://login.linode.com',
-    REACT_APP_API_ROOT: 'https://api.linode.com/v4',
-    REACT_APP_CLIENT_ID: '2a772aebc1f156e412e7',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '703354058b618e2fdb797bc8af1188f92dd0f058a436d17c35bc2a34ed2a3426',
-  },
-  alpha: {
-    REACT_APP_LOGIN_ROOT: 'https://login.dev.linode.com',
-    REACT_APP_API_ROOT: 'https://api.dev.linode.com/v4',
-    REACT_APP_CLIENT_ID: 'aa6136824c81ccc56672',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '9c956852ea96954acbad105b850caf2338dce03600126c5496ddb477be58ebc0',
-  },
-  devCloud: {
-    REACT_APP_LOGIN_ROOT: 'https://login.devcloud.linode.com',
-    REACT_APP_API_ROOT: 'https://api.devcloud.linode.com/v4',
-    REACT_APP_CLIENT_ID: '381cd97ee70b87235d90',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: '955ebd71b0afcd363e1f1c1a1aa76569d4d72dd247cc12ae5c29a94c01866ef9',
-  },
-  staging: {
-    REACT_APP_LOGIN_ROOT: 'https://login.staging.linode.com',
-    REACT_APP_API_ROOT: 'https://api.staging.linode.com/v4',
-    REACT_APP_CLIENT_ID: 'b4b43a1c26278f2c15cd',
-    REACT_APP_APP_ROOT: 'http://localhost:3000',
-    REACT_APP_LKE_HIGH_AVAILABILITY_PRICE: '60',
-    REACT_APP_LAUNCH_DARKLY_ID: '5cd5be32283709081fd70fbb',
-    MANAGER_OAUTH: 'b082b2eacf82592994c66fab256f28a02d2ccfd74a65b3ed6182f28320e94d1e',
-  }
-};
-
 // Express app
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+app.get('/env', async (req, res) => {
+  try {
+    const env = (req.query.env || 'prod').toLowerCase();
+
+    // getEnvConfig returns full config from env vars or source
+    const config = getEnvConfig(env);
+
+    // Write full config content to all required .env files
+    const contents = formatEnv(config);
+    const destinations = [
+      { dir: repoPath, file: path.join(repoPath, '.env') },
+      { dir: path.join(repoPath, 'packages', 'manager'), file: path.join(repoPath, 'packages', 'manager', '.env') },
+      { dir: localPackagesEnvDir, file: localPackagesEnvFile },
+    ];
+    for (const dest of destinations) {
+      if (!fs.existsSync(dest.dir)) fs.mkdirSync(dest.dir, { recursive: true });
+      if (fs.existsSync(dest.file)) fs.unlinkSync(dest.file);
+      fs.writeFileSync(dest.file, contents, 'utf8');
+    }
+
+    // Create a shallow copy and mask MANAGER_OAUTH before responding
+    const maskedConfig = { ...config };
+    if (maskedConfig.MANAGER_OAUTH) maskedConfig.MANAGER_OAUTH = 'XXX';
+
+    // Return masked config in JSON response only
+    res.json({
+      success: true,
+      message: `Env config for '${env}' written`,
+      config: maskedConfig,
+    });
+  } catch (err) {
+    console.error('/env error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+const getEnvConfig = (envKey) => {
+  try {
+    const raw = process.env[`CONFIG_${envKey.toUpperCase()}`];
+    if (!raw) throw new Error(`No config found for env: ${envKey}`);
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error(`Failed to parse env config for ${envKey}: ${e.message}`);
+  }
+};
+
+
+
 // Utilities
-function formatEnv(config) {
+const formatEnv = (config) => {
   return Object.entries(config)
     .map(([key, value]) => {
       if (typeof value === 'string') {
         value = value.trim().replace(/%$/, ''); // Trim and drop trailing %
+        return `${key}='${value}'`;
       }
-      return `${key}='${value}'`;
+      return `${key}=${value}`;
     })
     .join('\n');
-}
+};
+
 
 function replacePlaceholders(template, values) {
   return template.replace(/{{(.*?)}}/g, (_, key) => values[key] || '');
@@ -188,25 +200,30 @@ let specsRefreshing = false;
 const BRANCH_CACHE_TTL = 30 * 1000; // 30s
 const SPECS_CACHE_TTL = 60 * 1000; // 60s
 
+
 async function refreshBranchesCache() {
   if (branchesRefreshing) return; // already running
   branchesRefreshing = true;
   try {
     // Get all branch names
-    const { stdout: branchNamesOut } = await execGit(`git for-each-ref --format="%(refname:short)" refs/heads`, repoPath);
+    const { stdout: branchNamesOut } = await execGit(
+      `git for-each-ref --format="%(refname:short)" refs/heads`,
+      repoPath
+    );
     const names = branchNamesOut.trim().split('\n').map(s => s.trim()).filter(Boolean);
-
-    const remotes = await getRemotesAsync();
 
     const results = [];
 
     for (const name of names) {
       try {
         // createdAt: first commit date (ISO)
-        const { stdout: createdAtRaw } = await execGit(`git log --reverse --format="%aI" ${name} | head -1`, repoPath);
+        const { stdout: createdAtRaw } = await execGit(
+          `git log --reverse --format="%aI" ${name} | head -1`,
+          repoPath
+        );
         const createdAt = parseGitDateISO(createdAtRaw.trim());
 
-        // reflog line: grab one that mentions "branch: Created from" if present
+        // reflog line
         let reflogDate = '';
         try {
           const { stdout: reflogOut } = await execGit(
@@ -216,11 +233,9 @@ async function refreshBranchesCache() {
           const match = reflogOut.trim();
           const parsed = parseGitReflogDate(match);
           reflogDate = parsed ? parseGitDateISO(parsed.toISOString()) : '';
-        } catch (_) {
-          reflogDate = '';
-        }
+        } catch (_) {}
 
-        // try to determine upstream/tracking
+        // determine upstream/tracking
         let createdFrom = '';
         try {
           const { stdout: up } = await execGit(
@@ -228,34 +243,48 @@ async function refreshBranchesCache() {
             repoPath
           );
           createdFrom = (up || '').trim();
-        } catch (_) {
-          createdFrom = '';
-        }
+        } catch (_) {}
         if (!createdFrom) {
           createdFrom = extractCreatedFromFromName(name);
         }
+
+        // get first bug ticket for this branch
+        let bugTicket = "No ticket avalible";
+        try {
+          // Use git log to find the first commit message containing a ticket ID
+          const { stdout: ticketOut } = await execGit(
+            `git log ${name} --pretty=%B | grep -oE 'DI-[0-9]+' | head -1`,
+            repoPath
+          );
+          if (ticketOut && ticketOut.trim()) {
+            bugTicket = ticketOut.trim();
+          }
+        } catch (_) {}
 
         results.push({
           name,
           createdAt: createdAt || '',
           date: reflogDate || '',
-          createdFrom
+          createdFrom,
+          bugTicket
         });
       } catch (err) {
-        console.error(`Error processing branch ${name}:`, (err && err.message) || err);
-        results.push({ name, createdAt: '', date: '', createdFrom: '' });
+        console.error(`Error processing branch ${name}:`, err.message || err);
+        results.push({ name, createdAt: '', date: '', createdFrom: '', bugTicket: "No ticket avalible" });
       }
     }
 
     cachedBranches = results;
     branchesCacheTS = Date.now();
-    // console.log(`[cache] branches updated: ${cachedBranches.length}`);
   } catch (err) {
     console.error('refreshBranchesCache error:', err.message || err);
   } finally {
     branchesRefreshing = false;
   }
 }
+
+
+
 
 async function refreshSpecsCache() {
   if (specsRefreshing) return;
@@ -336,23 +365,31 @@ app.get('/getlog', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid repository path or not a Git repository' });
     }
 
-    const cmd = `git -C "${repoPath}" log -n 3 --no-merges --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s"`;
+    // git log command to get last 3 commits with formatted output
+    const cmd = `git -C "${repoPath}" log -n 3  --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s"`;
     const { stdout } = await execAsync(cmd);
 
     if (!stdout.trim()) {
       return res.status(404).json({ success: false, error: 'No commits found in repository' });
     }
 
+    // Regex to find JIRA ticket style IDs in commit messages
+    const ticketRegex = /DI-[0-9]+/g;
+
     const commits = stdout
       .trim()
       .split('\n')
       .map(line => {
         const [hash, author, date, ...messageParts] = line.split('|');
+        const message = messageParts.join('|').trim();
+        // Extract all ticket IDs matching the pattern
+        const tickets = message.match(ticketRegex) || [];
         return {
           commit: hash,
           author: author,
           date: date,
-          message: messageParts.join('|').trim(),
+          message: message,
+          tickets: tickets  // array of found ticket IDs, empty if none
         };
       });
 
@@ -650,12 +687,12 @@ app.post('/pull-and-pnpm', async (req, res) => {
     if (remote_branch_info) {
       try {
         const { stdout } = await execGit(`git pull ${shellEscapeArg(remote_name)} ${shellEscapeArg(branch_name)}`, repoPath);
-        pullResult = stdout.trim();
+        pullResult ='Pulled Successfully';
     
         // If there were changes (not just "Already up to date.")
         if (!pullResult.includes('Already up to date')) {
           const { stdout: diffStdout } = await execGit('git diff --name-only HEAD@{1} HEAD', repoPath);
-          // updatedFiles = diffStdout.split('\n').filter(Boolean); // filter out empty lines
+            updatedFiles = diffStdout.split('\n').filter(Boolean); // filter out empty lines
         }
       } catch (e) {
         errorMsg = e.message || e;
@@ -682,8 +719,8 @@ app.post('/pull-and-pnpm', async (req, res) => {
       remote_branch_info,
       remote_name,
       branch_name,
+      updatedFiles,
       message: errorMsg || pullResult || 'No output from git pull',
-      git_branch_vv: branchesStdout
     });
     
   } catch (err) {
