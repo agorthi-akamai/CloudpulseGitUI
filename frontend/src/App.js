@@ -31,16 +31,13 @@ import {
 import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
-import ButtonBase from "@mui/material/ButtonBase";
 import { DataGrid } from "@mui/x-data-grid";
 import DeleteIcon from "@mui/icons-material/Delete";
-import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import CloseIcon from "@mui/icons-material/Close";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import SyncIcon from "@mui/icons-material/Sync";
-import SettingsInputComponentIcon from "@mui/icons-material/SettingsInputComponent";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import Menu from "@mui/material/Menu";
@@ -99,27 +96,6 @@ function stringToColor(string) {
   return color;
 }
 
-const StyledTooltip = styled(({ className, ...props }) => (
-  <Tooltip {...props} arrow classes={{ popper: className }} />
-))(({ theme }) => ({
-  [`& .${tooltipClasses.tooltip}`]: {
-    background: "#fff",
-    color: "#0ea5e9",
-    border: "1.5px solid #bae6fd",
-    fontWeight: 600,
-    fontSize: 15,
-    borderRadius: 9,
-    boxShadow: "0 4px 14px 2px #bae6fd26",
-    padding: "7px 16px",
-    marginBottom: "7px", // visually spaces tooltip above chip
-    px: 2.2,
-    py: 1.15,
-  },
-  [`& .${tooltipClasses.arrow}`]: {
-    color: "#1976d2",
-  },
-}));
-
 const getCurrentBranchApi = async () => {
   const res = await fetch(`${API_URL}/current-branch`);
   if (!res.ok) throw new Error("Failed to get current branch");
@@ -156,12 +132,8 @@ const ENV_LABELS = {
 
 function App() {
   const [removeRemoteDialogOpen, setRemoveRemoteDialogOpen] = useState(false);
-  const [selectedRows, setSelectedRows] = useState([]);
-
-  const [showRemoveRemoteDialog, setShowRemoveRemoteDialog] = useState(false);
-  const [availableRemotes, setAvailableRemotes] = useState([]);
-
-  const [selectedRemote, setSelectedRemote] = useState("");
+  
+const [selectedRemote, setSelectedRemote] = useState("");
 
   const [menuAnchorEl, setMenuAnchorEl] = useState(null); // For popover anchor
   const [menuBranch, setMenuBranch] = useState(null);
@@ -205,18 +177,12 @@ function App() {
     }
   }, [menuAnchorEl, pendingCompareBranch]);
 
-  const environmentOptions = useMemo(
-    () => ENV_OPTIONS.map((env) => env.toUpperCase()),
-    [],
-  );
-
   // Delete confirmations
   const [confirmDelete, setConfirmDelete] = useState({
     open: false,
     branchName: "",
   });
-  const [confirmDeleteSelectedOpen, setConfirmDeleteSelectedOpen] =
-    useState(false);
+
 
   // Current branch display
   const [currentBranch, setCurrentBranch] = useState("");
@@ -267,33 +233,14 @@ function App() {
   const [branchLogLoading, setBranchLogLoading] = useState(false);
   const [branchLogList, setBranchLogList] = useState([]);
   const [branchLogError, setBranchLogError] = useState("");
-
-  const [compareToBranch, setCompareToBranch] = useState("");
-  const [compareCommits, setCompareCommits] = useState([]); // API data
-
-  // ... other hooks ...
   const [compareDialogOpen, setCompareDialogOpen] = useState(false);
   const [baseBranch, setBaseBranch] = useState("");
-  const summary = `Selected: ${baseBranch}`;
-
   const [compareBranch, setCompareBranch] = useState("");
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareResult, setCompareResult] = useState(null);
 
   const [isOpeningCreateDialog, setIsOpeningCreateDialog] = useState(false);
   const [showChangeset, setShowChangeset] = useState(false);
-
-  const handleOpenCreateDialog = () => {
-    if (isOpeningCreateDialog) return; // Ignore repeated calls quickly
-
-    setIsOpeningCreateDialog(true);
-    setCreateBranchDialogOpen(true);
-
-    // Reset flags after short delay (to allow dialog to open)
-    setTimeout(() => {
-      setIsOpeningCreateDialog(false);
-    }, 300); // adjust time as needed
-  };
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -309,14 +256,7 @@ function App() {
     createdAt: row.createdAt ?? row.createdat ?? "",
     createdFrom: row.createdFrom ?? row["created from"] ?? "",
   });
-
-  const openCompareDialog = (branchName) => {
-    // Don't close menu here
-    setBaseBranch(branchName);
-    setCompareBranch("");
-    setCompareDialogOpen(true);
-    setCompareResult(null);
-  };
+  // Handle branch selection changes
   const handleCompareBranches = async () => {
     setCompareLoading(true);
     setCompareResult(null);
@@ -692,43 +632,6 @@ function App() {
       newSet.delete(branchName);
       return newSet;
     });
-  };
-
-  // Confirm delete selected branches
-  const handleConfirmDeleteSelected = async () => {
-    setConfirmDeleteSelectedOpen(false);
-    if (!selectionModel.length) return;
-
-    setDeletingBranches((prev) => {
-      const newSet = new Set(prev);
-      selectionModel.forEach((b) => newSet.add(b));
-      return newSet;
-    });
-
-    const failed = [];
-    for (const branch of selectionModel) {
-      try {
-        const result = await deleteBranchApi(branch);
-        if (!result.success) failed.push(branch);
-      } catch {
-        failed.push(branch);
-      }
-      setDeletingBranches((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(branch);
-        return newSet;
-      });
-    }
-    setSnackbar({
-      open: true,
-      message:
-        failed.length === 0
-          ? `Deleted ${selectionModel.length} selected branch${selectionModel.length > 1 ? "es" : ""} successfully.`
-          : `Some deletions failed: ${failed.join(", ")}`,
-      severity: failed.length === 0 ? "success" : "error",
-    });
-    setBranches((prev) => prev.filter((b) => !selectionModel.includes(b.name)));
-    setSelectionModel([]);
   };
 
   // Stash handler
