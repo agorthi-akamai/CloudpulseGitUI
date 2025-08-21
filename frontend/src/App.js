@@ -51,6 +51,11 @@ import { styled } from "@mui/material/styles";
 import List from "@mui/material/List";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import SettingsBackupRestoreIcon from "@mui/icons-material/SettingsBackupRestore";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CloudOffIcon from "@mui/icons-material/CloudOff";
 
 const API_URL = process.env.REACT_APP_API_URL;
 const ENV_OPTIONS = ["prod", "alpha", "devCloud", "staging"];
@@ -312,44 +317,6 @@ function App() {
     setCompareDialogOpen(true);
     setCompareResult(null);
   };
-
-  function LoadingButton({ loading, onClick, children }) {
-    return (
-      <Button
-        variant="contained"
-        size="small"
-        disabled={loading}
-        sx={{
-          textTransform: "none",
-          fontWeight: 700,
-          fontSize: 16,
-          borderRadius: 3,
-          px: 2.5,
-          py: 1.25,
-          background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-          color: "#fff",
-          boxShadow: "0 4px 20px #f43f5e50", // Stronger, colored shadow
-          "&:hover": {
-            background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-            border: "3px solid #0ea5e9",
-            boxShadow: "0 6px 32px #0ea5e980",
-          },
-          boxSizing: "border-box",
-        }}
-        startIcon={
-          loading ? (
-            <CircularProgress color="inherit" size={16} />
-          ) : (
-            <SyncIcon />
-          )
-        }
-        onClick={onClick}
-      >
-        {loading ? `${children}ing...` : children}
-      </Button>
-    );
-  }
-
   const handleCompareBranches = async () => {
     setCompareLoading(true);
     setCompareResult(null);
@@ -1073,12 +1040,11 @@ function App() {
     loading = false,
     color = "primary",
     variant = "contained",
-    size = "small",
+    size = "size",
     sx = {},
   }) => {
-    // If loading is true, override startIcon with a spinner
     const icon = loading ? (
-      <CircularProgress color="inherit" size={16} />
+      <CircularProgress color="inherit" size={18} />
     ) : (
       startIcon
     );
@@ -1093,20 +1059,18 @@ function App() {
         color={color}
         sx={{
           textTransform: "none",
-          fontWeight: 700,
-          fontSize: 16,
-          borderRadius: 3,
-          px: 2.5,
-          py: 1.25,
+          fontWeight: 500,
+          fontSize: 13,
+          borderRadius: 2,
+          px: 1.1, // Padding left and right – controls button padding, not width
+          py: 1.2, // Padding top/bottom
           background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
           color: "#fff",
-          boxShadow: "0 4px 20px #f43f5e50",
+          boxShadow: "0 2px 8px #0ea5e950",
           "&:hover": {
             background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-            border: "3px solid #0ea5e9",
-            boxShadow: "0 6px 32px #0ea5e980",
+            border: "2px solid #0ea5e9",
           },
-          boxSizing: "border-box",
           ...sx,
         }}
       >
@@ -1968,9 +1932,16 @@ function App() {
             </Typography>
           </Box>
 
-          {/* Action Buttons */}
           <Box
-            sx={{ display: "flex", gap: { xs: 1, sm: 2, position: "sticky" } }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "nowrap",
+              overflowX: "auto",
+              mt: 2,
+              mb: 2,
+            }}
           >
             <AppButton
               startIcon={<AddIcon />}
@@ -1981,6 +1952,7 @@ function App() {
                 setCreateBranchName("");
               }}
               disabled={isOpeningCreateDialog}
+              sx={{ minWidth: 128 }}
             >
               Create
             </AppButton>
@@ -1990,17 +1962,21 @@ function App() {
               loading={isPulling}
               onClick={handlePull}
               disabled={isPulling}
+              sx={{ minWidth: 128 }}
             >
               Pull
             </AppButton>
 
             <AppButton
+              startIcon={<SettingsBackupRestoreIcon />} // "restore" or "save" for stash
               loading={isStashing}
               onClick={handleStashChanges}
               disabled={isStashing}
+              sx={{ minWidth: 128 }}
             >
               Stash
             </AppButton>
+
             <FloatingWhiteTooltip
               title={
                 lastEnvKey && ENV_LABELS[lastEnvKey]
@@ -2013,9 +1989,9 @@ function App() {
                 tooltip: {
                   sx: {
                     background:
-                      "linear-gradient(90deg, #0ea5e9 80%, #38bdf8 100%)", // blue gradient background
-                    color: "#fff", // white text
-                    fontWeight: 700, // bold
+                      "linear-gradient(90deg, #0ea5e9 80%, #38bdf8 100%)",
+                    color: "#fff",
+                    fontWeight: 700,
                     fontSize: "15px",
                     borderRadius: 1.5,
                     boxShadow: "0 3px 16px #0ea5e9cc",
@@ -2024,264 +2000,227 @@ function App() {
                   },
                 },
                 arrow: {
-                  sx: {
-                    color: "#0ea5e9",
-                  },
+                  sx: { color: "#0ea5e9" },
                 },
               }}
             >
-              <div style={{ display: "inline-block" }}>
-                <AppButton onClick={handleOpenEnvSwitcher}>Switch</AppButton>
-              </div>
+              {/* Tooltip can directly wrap AppButton */}
+              <span>
+                <AppButton
+                  startIcon={<CompareArrowsIcon />} // arrows for switch/swap
+                  onClick={handleOpenEnvSwitcher}
+                  sx={{ minWidth: 128 }}
+                >
+                  Switch
+                </AppButton>
+              </span>
             </FloatingWhiteTooltip>
-            <div style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}>
-              <AppButton
-                startIcon={<SettingsInputComponentIcon />}
-                onClick={handleStartService}
+
+            <AppButton
+              startIcon={<PowerSettingsNewIcon />} // power/start symbol for start
+              onClick={handleStartService}
+              sx={{ minWidth: 128 }}
+            >
+              Start
+            </AppButton>
+
+            <AppButton
+              onClick={() => setAutomationDialogOpen(true)}
+              startIcon={<PlayCircleOutlineIcon />} // play symbol for run/test
+              sx={{ minWidth: 128 }}
+            >
+              Run Specs
+            </AppButton>
+
+            <AppButton
+              color="secondary"
+              startIcon={<CloudUploadIcon />} // upload/cloud for add remote
+              onClick={() => setAddRemoteDialogOpen(true)}
+              sx={{ minWidth: 128 }}
+            >
+              Add Remote
+            </AppButton>
+
+            <AppButton
+              color="secondary"
+              onClick={handleOpenRemoveRemote}
+              startIcon={<CloudOffIcon />}
+              sx={{
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: 2,
+                px: 1.1,
+                py: 1.1,
+                minWidth: 0, // ensures autosize, not forced wide
+                textTransform: "none",
+                boxShadow: "0 2px 8px #0ea5e950",
+                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+                color: "#fff",
+                "&:hover": {
+                  background:
+                    "linear-gradient(90deg, #2563eb 80%, #38bdf8 100%)",
+                  border: "2px solid #0ea5e9",
+                  boxShadow: "0 4px 16px #0ea5e980",
+                },
+              }}
+            >
+              Remove Remote
+            </AppButton>
+          </Box>
+
+          <Dialog
+            open={removeRemoteDialogOpen}
+            onClose={() => setRemoveRemoteDialogOpen(false)}
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                minWidth: 400,
+                p: 1,
+                boxShadow: "0 8px 40px #00000030",
+                backgroundColor: "#fff",
+              },
+            }}
+          >
+            <DialogTitle
+              sx={{
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: 24,
+                pb: 0,
+                pt: 2,
+                letterSpacing: 0,
+              }}
+            >
+              Remove Remote
+            </DialogTitle>
+            <DialogContent
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                pt: 2,
+                pb: 0,
+              }}
+            >
+              <RadioGroup
+                value={selectedRemote}
+                onChange={(e) => setSelectedRemote(e.target.value)}
+                sx={{ width: "100%" }}
               >
-                Start
-              </AppButton>
-              <Dialog
-                open={addRemoteDialogOpen}
-                onClose={() => {
+                {remotes.map((remote) => (
+                  <FormControlLabel
+                    key={remote}
+                    value={remote}
+                    control={<Radio />}
+                    label={
+                      <Typography sx={{ fontSize: 18 }}>{remote}</Typography>
+                    }
+                    sx={{ my: 1 }}
+                  />
+                ))}
+              </RadioGroup>
+              {remotes.length === 0 && (
+                <Typography sx={{ fontSize: 18, color: "#888" }}>
+                  No remotes available
+                </Typography>
+              )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button
+                onClick={() => setRemoveRemoteDialogOpen(false)}
+                sx={{
+                  color: "#0ea5e9",
+                  fontWeight: 700,
+                  textTransform: "none",
+                  fontSize: 16,
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                disabled={!selectedRemote}
+                onClick={handleDeleteRemote}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 16,
+                  textTransform: "none",
+                  borderRadius: 2,
+                  alignItems: "center",
+                  px: 3,
+                  py: 1,
+                }}
+              >
+                Delete
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Snackbar
+            open={snackbar.open}
+            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+            autoHideDuration={3000}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          >
+            <Alert
+              onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+              severity={snackbar.severity}
+              sx={{ width: "100%" }}
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+
+          <Dialog
+            open={addRemoteDialogOpen}
+            onClose={() => {
+              setAddRemoteDialogOpen(false);
+              setNewRemoteName("");
+              setNewRemoteUrl("");
+            }}
+          >
+            <DialogTitle>Add Git Remote</DialogTitle>
+            <DialogContent>
+              <TextField
+                label="Remote Name"
+                value={newRemoteName}
+                onChange={(e) => setNewRemoteName(e.target.value)}
+                fullWidth
+                margin="normal"
+                autoFocus
+                required
+              />
+              <TextField
+                label="Remote URL"
+                value={newRemoteUrl}
+                onChange={(e) => setNewRemoteUrl(e.target.value)}
+                fullWidth
+                margin="normal"
+                required
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => {
                   setAddRemoteDialogOpen(false);
                   setNewRemoteName("");
                   setNewRemoteUrl("");
                 }}
-              >
-                <DialogTitle>Add Git Remote</DialogTitle>
-                <DialogContent>
-                  <TextField
-                    label="Remote Name"
-                    value={newRemoteName}
-                    onChange={(e) => setNewRemoteName(e.target.value)}
-                    fullWidth
-                    margin="normal"
-                    autoFocus
-                    required
-                  />
-                  <TextField
-                    label="Remote URL"
-                    value={newRemoteUrl}
-                    onChange={(e) => setNewRemoteUrl(e.target.value)}
-                    fullWidth
-                    margin="normal"
-                    required
-                  />
-                </DialogContent>
-                <DialogActions>
-                  <Button
-                    onClick={() => {
-                      setAddRemoteDialogOpen(false);
-                      setNewRemoteName("");
-                      setNewRemoteUrl("");
-                    }}
-                    color="secondary"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleAddRemote}
-                    color="primary"
-                    variant="contained"
-                    disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
-                  >
-                    {isAddingRemote ? "Adding..." : "Create"}
-                  </Button>
-                </DialogActions>
-              </Dialog>
-
-              <AppButton
-                onClick={() => setAutomationDialogOpen(true)}
-                startIcon={<SettingsInputComponentIcon />}
-              >
-                Run Specs
-              </AppButton>
-              <AppButton
                 color="secondary"
-                onClick={() => setAddRemoteDialogOpen(true)}
               >
-                Add Remote
-              </AppButton>
-
-              <AppButton
-                sx={{
-                  minWidth: 150,
-                  boxShadow: "0 2px 12px #0ea5e930",
-                  borderRadius: 2,
-                  letterSpacing: 1,
-                  background:
-                    "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
-                  "&:hover": {
-                    background:
-                      "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                    color: "#fff",
-                    border: "2px solid #0ea5e9",
-                    boxShadow: "0 4px 20px #f43f5e50",
-                  },
-                }}
-                onClick={handleOpenRemoveRemote}
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddRemote}
+                color="primary"
+                variant="contained"
+                disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
               >
-                Remove Remote
-              </AppButton>
-            </div>
-
-            <Dialog
-              open={removeRemoteDialogOpen}
-              onClose={() => setRemoveRemoteDialogOpen(false)}
-              PaperProps={{
-                sx: {
-                  borderRadius: 3,
-                  minWidth: 400,
-                  p: 1,
-                  boxShadow: "0 8px 40px #00000030",
-                  backgroundColor: "#fff",
-                },
-              }}
-            >
-              <DialogTitle
-                sx={{
-                  fontWeight: 700,
-                  textAlign: "center",
-                  fontSize: 24,
-                  pb: 0,
-                  pt: 2,
-                  letterSpacing: 0,
-                }}
-              >
-                Remove Remote
-              </DialogTitle>
-              <DialogContent
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  pt: 2,
-                  pb: 0,
-                }}
-              >
-                <RadioGroup
-                  value={selectedRemote}
-                  onChange={(e) => setSelectedRemote(e.target.value)}
-                  sx={{ width: "100%" }}
-                >
-                  {remotes.map((remote) => (
-                    <FormControlLabel
-                      key={remote}
-                      value={remote}
-                      control={<Radio />}
-                      label={
-                        <Typography sx={{ fontSize: 18 }}>{remote}</Typography>
-                      }
-                      sx={{ my: 1 }}
-                    />
-                  ))}
-                </RadioGroup>
-                {remotes.length === 0 && (
-                  <Typography sx={{ fontSize: 18, color: "#888" }}>
-                    No remotes available
-                  </Typography>
-                )}
-              </DialogContent>
-              <DialogActions sx={{ px: 3, pb: 2 }}>
-                <Button
-                  onClick={() => setRemoveRemoteDialogOpen(false)}
-                  sx={{
-                    color: "#0ea5e9",
-                    fontWeight: 700,
-                    textTransform: "none",
-                    fontSize: 16,
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  color="error"
-                  disabled={!selectedRemote}
-                  onClick={handleDeleteRemote}
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    textTransform: "none",
-                    borderRadius: 2,
-                    alignItems: "center",
-                    px: 3,
-                    py: 1,
-                  }}
-                >
-                  Delete
-                </Button>
-              </DialogActions>
-            </Dialog>
-            <Snackbar
-              open={snackbar.open}
-              onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-              autoHideDuration={3000}
-              anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-              <Alert
-                onClose={() =>
-                  setSnackbar((prev) => ({ ...prev, open: false }))
-                }
-                severity={snackbar.severity}
-                sx={{ width: "100%" }}
-              >
-                {snackbar.message}
-              </Alert>
-            </Snackbar>
-
-            <Dialog
-              open={addRemoteDialogOpen}
-              onClose={() => {
-                setAddRemoteDialogOpen(false);
-                setNewRemoteName("");
-                setNewRemoteUrl("");
-              }}
-            >
-              <DialogTitle>Add Git Remote</DialogTitle>
-              <DialogContent>
-                <TextField
-                  label="Remote Name"
-                  value={newRemoteName}
-                  onChange={(e) => setNewRemoteName(e.target.value)}
-                  fullWidth
-                  margin="normal"
-                  autoFocus
-                  required
-                />
-                <TextField
-                  label="Remote URL"
-                  value={newRemoteUrl}
-                  onChange={(e) => setNewRemoteUrl(e.target.value)}
-                  fullWidth
-                  margin="normal"
-                  required
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => {
-                    setAddRemoteDialogOpen(false);
-                    setNewRemoteName("");
-                    setNewRemoteUrl("");
-                  }}
-                  color="secondary"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddRemote}
-                  color="primary"
-                  variant="contained"
-                  disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
-                >
-                  {isAddingRemote ? "Adding..." : "Create"}
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </Box>
+                {isAddingRemote ? "Adding..." : "Create"}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Box>
         <Dialog
           open={automationDialogOpen}
