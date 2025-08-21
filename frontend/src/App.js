@@ -27,6 +27,7 @@ import {
   Skeleton,
   Checkbox,
   Avatar,
+  Collapse
 } from "@mui/material";
 import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -53,6 +54,10 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloudOffIcon from "@mui/icons-material/CloudOff";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import RefreshIcon from "@mui/icons-material/Refresh";
+
 
 const API_URL = process.env.REACT_APP_API_URL;
 const ENV_OPTIONS = ["prod", "alpha", "devCloud", "staging"];
@@ -82,6 +87,17 @@ const deleteBranchApi = async (branchName) => {
     };
   }
 };
+const branchTypeColors = {
+  aclp: "#2563eb",      // blue (used for 'aclp')
+  ankita: "#facc15",    // yellow (used for 'ankita')
+  linode: "#16a34a",    // green (used for 'linode')
+  nikil: "#64748b",     // gray (nikil)
+  origin: "#dc2626",    // red (used for 'origin')
+  santosh: "#a21caf",   // purple (santosh)
+  venky: "#0ea5e9",     // cyan (venky)
+  default: "#dc2626"    // fallback gray
+};
+
 function stringToColor(string) {
   let hash = 0;
   let i;
@@ -156,6 +172,17 @@ const [selectedRemote, setSelectedRemote] = useState("");
   const [selectionModel, setSelectionModel] = useState([]);
   const [deletingBranches, setDeletingBranches] = useState(new Set());
   const [pendingCompareBranch, setPendingCompareBranch] = React.useState(null);
+  const [runOutput, setRunOutput] = useState('');
+  const [runError, setRunError] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+
+  const [outputOpen, setOutputOpen] = useState(false);
+  const [serverOutput, setServerOutput] = useState('');
+  const [serverError, setServerError] = useState('');
+  const [isServerRunning, setIsServerRunning] = useState(false);
+  const [serverOutputOpen, setServerOutputOpen] = useState(true);
+  
+  
 
   // Instead of opening and closing in same event tick:
 
@@ -241,6 +268,7 @@ const [selectedRemote, setSelectedRemote] = useState("");
 
   const [isOpeningCreateDialog, setIsOpeningCreateDialog] = useState(false);
   const [showChangeset, setShowChangeset] = useState(false);
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -436,7 +464,6 @@ const [selectedRemote, setSelectedRemote] = useState("");
       fetch(`${API_URL}/list-specs`)
         .then((res) => res.json())
         .then((data) => {
-          console.log("Spec API data:", data); // ← ADD THIS LINE!
           setSpecList(Array.isArray(data) ? data : []);
           setCheckedSpecs([]);
           setSelectAll(false);
@@ -455,7 +482,6 @@ const [selectedRemote, setSelectedRemote] = useState("");
     fetch(`${API_URL}/remotes`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("Fetched remotes:", data.remotes);
         if (active && data.remotes) setRemotes(data.remotes);
       })
       .catch((e) => {
@@ -472,7 +498,6 @@ const [selectedRemote, setSelectedRemote] = useState("");
     fetch(`${API_URL}/remotes`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("Fetched remotes:", data.remotes);
         if (active && data.remotes) setRemotes(data.remotes);
       })
       .catch(() => setRemotes([]));
@@ -732,34 +757,28 @@ const [selectedRemote, setSelectedRemote] = useState("");
 
   //start service
   const handleStartService = async () => {
+    setIsServerRunning(true);
+    setServerOutput('');
+    setServerError('');
     try {
-      // Example: Replace with your real API endpoint
-      const resp = await fetch(`${API_URL}/start-service`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const resp = await fetch(`${API_URL}/start-service`);
       const data = await resp.json();
       if (data.success) {
-        setSnackbar({
-          open: true,
-          message: data.message || "Service started.",
-          severity: "success",
-        });
+        setServerOutput(data.output || data.message || 'Service started.');
+        setServerError('');
       } else {
-        setSnackbar({
-          open: true,
-          message: data.error || "Failed to start service.",
-          severity: "error",
-        });
+        setServerOutput('');
+        setServerError(data.error || 'Failed to start service.');
       }
-    } catch (e) {
-      setSnackbar({
-        open: true,
-        message: "Failed to start service.",
-        severity: "error",
-      });
+    } catch {
+      setServerOutput('');
+      setServerError('Failed to start service.');
+    } finally {
+      setIsServerRunning(false);
     }
   };
+  
+  
 
   const handleShowBranchLog = async () => {
     setBranchLogDialogOpen(true);
@@ -818,9 +837,14 @@ const [selectedRemote, setSelectedRemote] = useState("");
   };
 
   const FloatingWhiteTooltip = styled(({ className, ...props }) => (
-    <Tooltip {...props} arrow placement="top" classes={{ popper: className }} />
+    <Tooltip
+      {...props}
+      arrow
+      placement="top"
+      classes={{ tooltip: className }}  // <-- FIXED HERE!!
+    />
   ))(() => ({
-    [`& .${tooltipClasses.tooltip}`]: {
+    [`&.${tooltipClasses.tooltip}`]: {  // <-- FIXED SELECTOR!
       background: "#fff",
       color: "#0ea5e9",
       border: "1.5px solid #bae6fd",
@@ -829,13 +853,15 @@ const [selectedRemote, setSelectedRemote] = useState("");
       borderRadius: 9,
       boxShadow: "0 4px 14px 2px #bae6fd26",
       padding: "7px 16px",
-      marginBottom: "7px", // visually spaces tooltip above chip
+      marginBottom: "7px",
     },
     [`& .${tooltipClasses.arrow}`]: {
       color: "#fff",
       filter: "drop-shadow(0 2px 7px #bae6fd55)",
     },
   }));
+ 
+ 
   // Create new branch handler
   const handleCreateBranch = async () => {
     setIsSubmittingCreate(true);
@@ -1036,6 +1062,27 @@ const [selectedRemote, setSelectedRemote] = useState("");
       });
     }
   };
+  const handleRunSpecs = async (specPaths) => {
+    setIsRunning(true);
+    setRunOutput(''); // <-- clear previous output immediately
+    setRunError('');
+    try {
+      const resp = await fetch(`${API_URL}/run-automation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specPaths }),
+      });
+      const data = await resp.json();
+  
+      // Append all new output, or error if present
+      if (data.output) setRunOutput(prev => prev + data.output);
+      if (data.error) setRunError(prev => prev + data.error);
+    } catch (e) {
+      setRunError(prev => prev + (e.message || 'Error running specs'));
+    }
+    setIsRunning(false);
+  };
+  
 
   const handleDelete = (branchName) => {
     // You can still use your confirmation dialog if needed!
@@ -1172,64 +1219,46 @@ const [selectedRemote, setSelectedRemote] = useState("");
       headerName: "Branch Name",
       minWidth: 240,
       flex: 1.2,
-      renderHeader: () => (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            pl: 1,
-            position: "sticky",
-          }}
-        >
-          <GitHubIcon sx={{ color: "#0ea5e9" }} fontSize="small" />
-          <span style={{ fontWeight: 700 }}>Branch Name</span>
-        </Box>
-      ),
-      renderCell: (params) => (
-        <FloatingWhiteTooltip
-          title={params.value}
-          arrow
-          componentsProps={{ tooltip: { sx: { marginBottom: "6px" } } }}
-        >
-          <Chip
-            label={params.value}
-            onClick={() => handleShowStats(params.value)}
-            clickable
+      renderHeader: () => <strong>Branch Name</strong>,
+      renderCell: (params) => {
+      
+        const branchName = (params.value || "").toLowerCase();
+        // Find the FIRST matching remote whose name is contained anywhere in the branch name
+        const foundRemote =
+          remotes.find(remote => branchName.includes(remote)) || "default";
+        const color = branchTypeColors[foundRemote] || branchTypeColors.default;
+          return (
+          <Box
             sx={{
+              display: "flex",
+              alignItems: "center",
               maxWidth: 285,
-              minWidth: 68,
-              height: 36,
-              fontWeight: 600,
-              fontSize: 15,
-              color: "#2563eb",
-              bgcolor: "#e0f2fe",
-              border: "2px solid #38bdf8",
-              borderRadius: "18px",
-              boxShadow: "0 2px 8px #bae6fd22",
-              px: 2,
+              cursor: "pointer",
               textOverflow: "ellipsis",
               overflow: "hidden",
               whiteSpace: "nowrap",
-              cursor: "pointer",
-              transition: "all .14s",
-              "&:hover": {
-                bgcolor: "#bae6fd",
-                color: "#2563eb",
-                borderColor: "#2563eb",
-                boxShadow: "0 4px 16px #38bdf84a",
-              },
-              "& .MuiChip-label": {
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                px: 0,
-              },
             }}
-          />
-        </FloatingWhiteTooltip>
-      ),
+            onClick={() => handleShowStats(params.value)}
+            title={params.value}
+          >
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: color,
+                mr: 1,
+                flexShrink: 0,
+              }}
+            />
+            <Typography noWrap sx={{ fontWeight: 600, color: "#2563eb", userSelect: "text" }}>
+              {params.value}
+            </Typography>
+          </Box>
+        );
+      },
     },
+    
     {
       field: "date",
       headerName: "Branch Creation Date",
@@ -2234,24 +2263,10 @@ const [selectedRemote, setSelectedRemote] = useState("");
               color="primary"
               disabled={checkedSpecs.length === 0}
               onClick={() => {
-                fetch(`${API_URL}/run-automation`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ specPaths: checkedSpecs }),
-                })
-                  .then((res) => res.json())
-                  .then((data) =>
-                    setSnackbar({
-                      open: true,
-                      message: data.message || "Automation started.",
-                      severity: data.success ? "success" : "error",
-                    }),
-                  );
-                setAutomationDialogOpen(false);
-                setCheckedSpecs([]);
-                setSelectAll(false);
+                setAutomationDialogOpen(false);        // 1. Close the dialog immediately
+                handleRunSpecs(checkedSpecs);          // 2. Then run the specs
               }}
-            >
+ >
               Run Selected{" "}
               {checkedSpecs.length > 0 ? `(${checkedSpecs.length})` : ""}
             </Button>
@@ -2711,7 +2726,7 @@ const [selectedRemote, setSelectedRemote] = useState("");
             </span>
           </FloatingWhiteTooltip>
         </Box>
-        {/* Branch Table */}
+         {/* Branch Table */}
         <Box sx={{ mb: 1 }}></Box>
         <Paper
           elevation={4}
@@ -2724,8 +2739,64 @@ const [selectedRemote, setSelectedRemote] = useState("");
             mb: 3,
           }}
         >
+<Box sx={{ mt: 3, mb: 2 }}>
+  <Paper variant="outlined" sx={{
+    p: 1.5,
+    borderRadius: 3,
+    bgcolor: "#f0f9ff",
+    boxShadow: "0 2px 18px #bae6fd22",
+    minHeight: 50,
+  }}>
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+    <Typography sx={{ fontWeight: 700, fontSize: 17, mr: 1, color: '#0ea5e9' }}>
+      Cypress Output
+    </Typography>
+
+      <Tooltip title={outputOpen ? "Minimize" : "Maximize"}>
+        <IconButton size="small" onClick={() => setOutputOpen(o => !o)}>
+          {outputOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Copy Output">
+        <IconButton
+          size="small"
+          sx={{ ml: 0.5 }}
+          onClick={() => {
+            navigator.clipboard.writeText(runOutput + (runError ? "\n" + runError : ""));
+            setSnackbar({ open: true, message: "Output copied to clipboard!", severity: "success" });
+          }}
+        >
+          <ContentCopyIcon />
+        </IconButton>
+      </Tooltip>
+    </Box>
+    <Collapse in={outputOpen}>
+    <Box
+  sx={{
+    bgcolor: "#171717",   // Black background (tailwind neutral-900)
+    color: "#fff",        // White text
+    borderRadius: 2,
+    p: 2,
+    whiteSpace: "pre-wrap",
+    fontFamily: "monospace",
+    fontSize: 14,
+    minHeight: 120,
+    overflowY: "auto",
+  }}
+>
+  {isRunning 
+    ? "Running specs..."
+    : runOutput || runError || "No Cypress output yet."
+  }
+</Box>
+
+    </Collapse>
+  </Paper>
+</Box>
+
           <Box sx={{ overflowX: "auto", position: "sticky" }}>
             <DataGrid
+              autoHeight
               rows={branches}
               columns={columns}
               checkboxSelection

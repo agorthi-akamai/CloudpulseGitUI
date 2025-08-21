@@ -15,7 +15,7 @@
 
 const express = require('express');
 const cors = require('cors');
-const { exec: execCb } = require('child_process');
+const { exec: execCb,spawn } = require('child_process');
 const util = require('util');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -732,7 +732,6 @@ app.post('/pull-and-pnpm', async (req, res) => {
 /** /run-automation - start cypress via Terminal (macOS) */
 app.post('/run-automation', async (req, res) => {
   try {
-    // Accept either specPaths array or specPath string
     const specs = Array.isArray(req.body.specPaths)
       ? req.body.specPaths
       : (typeof req.body.specPath === 'string' ? [req.body.specPath] : []);
@@ -742,30 +741,31 @@ app.post('/run-automation', async (req, res) => {
 
     const joinedSpecs = specs.join(',');
     const cdDir = repoPath; // use configured repoPath
-    const cyCommand = [
-      `cd ${shellEscapeArg(cdDir)}`,
-      `pnpm cy:run -s ${shellEscapeArg(joinedSpecs)}`,
-      `echo`,
-      `echo "[Cypress finished. Press Enter to close.]"`,
-      `read`
-    ].join(' && ');
+    const cyCommand = `cd ${shellEscapeArg(cdDir)} && pnpm cy:run -s ${shellEscapeArg(joinedSpecs)}`;
 
-    // Escape double quotes for AppleScript
-    const appleScriptCmd = `osascript -e ${shellEscapeArg(`tell application "Terminal" to do script "${cyCommand.replace(/"/g, '\\"')}"`)}`;
-
-    // Launch terminal (macOS)
-    execCb(appleScriptCmd, (error, stdout, stderr) => {
+    // Spawn the process and capture its entire output
+    exec(cyCommand, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
       if (error) {
-        console.error('osascript error:', stderr || error.message);
-        return res.status(500).json({ success: false, error: stderr || error.message });
+        return res.status(500).json({
+          success: false,
+          error: stderr || error.message,
+          output: stdout   // include what output was produced
+        });
       }
-      return res.json({ success: true, message: 'Cypress test(s) launched in a new Terminal window.', filesRun: specs });
+      res.json({
+        success: true,
+        message: 'Cypress test(s) finished.',
+        output: stdout,
+        error: stderr,
+        filesRun: specs
+      });
     });
   } catch (err) {
-    console.error('/run-automation error:', err.message || err);
     res.status(500).json({ success: false, error: err.message || 'Failed to launch automation' });
   }
 });
+
+
 
 /** /start-service - spawn dev server in new Terminal (macOS) */
 app.get('/start-service', (req, res) => {
@@ -797,39 +797,82 @@ app.get('/start-service', (req, res) => {
   }
 });
 
-/** /get-branches-tracking-remote?remote=aclp */
-app.get('/get-branches-tracking-remote', async (req, res) => {
-  try {
-    const remote = (req.query.remote || '').toString();
-    if (!remote) {
-      return res.status(400).json({ success: false, message: "Missing required query parameter: 'remote'." });
-    }
-    // Use git branch -vv and filter locally
-    const { stdout } = await execGit(`git branch -vv`, repoPath);
-    const lines = stdout.split('\n');
-    const branches = lines
-      .map(l => l.trim())
-      .filter(l => l.includes(`${remote}/`))
-      .map(l => {
-        // remove leading '* ' if present and return first token as branch name
-        const cleaned = l.replace(/^\* /, '');
-        const parts = cleaned.split(/\s+/);
-        return parts[0];
-      })
-      .filter(Boolean);
+let devProcess = null;
 
-    const start = Date.now();
-    const duration = `${((Date.now() - start) / 1000).toFixed(2)}s`;
-
-    if (branches.length === 0) {
-      return res.json({ success: false, remote, count: 0, duration, message: 'No branches found for remote', branches: [] });
-    }
-    res.json({ success: true, remote, count: branches.length, duration, message: `Fetched ${branches.length} branches`, branches });
-  } catch (err) {
-    console.error('/get-branches-tracking-remote error:', err.message || err);
-    res.status(500).json({ success: false, message: 'Failed to fetch branches for remote', error: err.message || err });
+app.get('/start-service1', (req, res) => {
+  if (devProcess) {
+    res.status(400).send('Dev server already running.');
+    return;
   }
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  res.flushHeaders();
+
+  const devCommand = `cd ${shellEscapeArg(repoPath)} && lsof -ti:3000 | xargs kill -9 || true && pnpm dev`;
+
+  devProcess = spawn('lsof -ti:3000 | xargs kill -9 || true && pnpm', ['dev'], { cwd: repoPath });
+
+  devProcess.stdout.on('data', (data) => {
+    res.write(`data: ${data.toString()}\n\n`);
+  });
+  devProcess.stderr.on('data', (data) => {
+    res.write(`data: [stderr] ${data.toString()}\n\n`);
+  });
+  devProcess.on('close', (code) => {
+    res.write(`data: Dev server stopped (exit code ${code})\n\n`);
+    devProcess = null;
+    res.end();
+  });
+
+  req.on('close', () => {
+    if (devProcess) devProcess.kill();
+  });
 });
+
+
+/** /get-branches-tracking-remote?remote=aclp */
+
+app.get('/start-service-temp', (req, res) => {
+  // First, kill port 3000 directly from Node
+  exec('lsof -ti:3000 | xargs kill -9 || true', (killErr, stdout, stderr) => {
+    if (killErr) {
+      res.status(500).json({ success: false, error: 'Failed to kill previous dev server', details: stderr || killErr.message });
+      return;
+    }
+
+    // Optionally, check if port is really free:
+    exec('lsof -ti:3000', (checkErr, pids) => {
+      if (pids.trim() !== '') {
+        res.status(400).json({ success: false, error: 'Port 3000 still in use. Cannot launch new dev server.' });
+        return;
+      }
+
+      const devCommand = [
+        `cd ${shellEscapeArg(repoPath)}`,
+        `pnpm dev; echo; echo 'Dev server terminated. Press Enter to close.'; read`
+      ].join(' && ');
+
+      function escapeAppleScriptStr(s) {
+        return s.replace(/([\\"])/g, '\\$1');
+      }
+      const script = escapeAppleScriptStr(devCommand);
+      const osaScriptCmd = `osascript -e "tell application \\"Terminal\\" to do script \\"${script}\\""`; 
+
+      exec(osaScriptCmd, (err, stdout, stderr) => {
+        if (err) {
+          res.status(500).json({ success: false, error: 'Failed to launch Terminal', details: stderr || err.message });
+        } else {
+          res.json({ success: true, message: "Launching dev commands in a new Terminal window..." });
+        }
+      });
+    });
+  });
+});
+
 
 /** /get-remote-names - list remotes */
 app.get('/get-remote-names', async (req, res) => {
