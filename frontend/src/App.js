@@ -26,6 +26,7 @@ import {
   Autocomplete,
   Skeleton,
   Checkbox,
+  Avatar,
 } from "@mui/material";
 import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -49,6 +50,7 @@ import Tooltip, { tooltipClasses } from "@mui/material/Tooltip";
 import { styled } from "@mui/material/styles";
 import List from "@mui/material/List";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 
 const API_URL = process.env.REACT_APP_API_URL;
 const ENV_OPTIONS = ["prod", "alpha", "devCloud", "staging"];
@@ -78,6 +80,19 @@ const deleteBranchApi = async (branchName) => {
     };
   }
 };
+function stringToColor(string) {
+  let hash = 0;
+  let i;
+  for (i = 0; i < string.length; i++) {
+    hash = string.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = "#";
+  for (i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xff;
+    color += ("00" + value.toString(16)).slice(-2);
+  }
+  return color;
+}
 
 const StyledTooltip = styled(({ className, ...props }) => (
   <Tooltip {...props} arrow classes={{ popper: className }} />
@@ -136,9 +151,11 @@ const ENV_LABELS = {
 
 function App() {
   const [removeRemoteDialogOpen, setRemoveRemoteDialogOpen] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
 
-  const [setShowRemoveRemoteDialog] = useState(false);
-  const [setAvailableRemotes] = useState([]);
+  const [showRemoveRemoteDialog, setShowRemoveRemoteDialog] = useState(false);
+  const [availableRemotes, setAvailableRemotes] = useState([]);
+
   const [selectedRemote, setSelectedRemote] = useState("");
 
   const [menuAnchorEl, setMenuAnchorEl] = useState(null); // For popover anchor
@@ -153,9 +170,6 @@ function App() {
   const [newRemoteName, setNewRemoteName] = useState("");
   const [newRemoteUrl, setNewRemoteUrl] = useState("");
   const [isAddingRemote, setIsAddingRemote] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // 'success' | 'error'
 
   const [remotes, setRemotes] = useState([]);
   // State for branches, selection, search and loading
@@ -164,19 +178,32 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectionModel, setSelectionModel] = useState([]);
   const [deletingBranches, setDeletingBranches] = useState(new Set());
+  const [pendingCompareBranch, setPendingCompareBranch] = React.useState(null);
 
+  // Instead of opening and closing in same event tick:
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setMenuBranch(null);
+  };
+
+  // Effect to open dialog after menu closes and pending branch is set
+  React.useEffect(() => {
+    if (!menuAnchorEl && pendingCompareBranch) {
+      setSnackbar((prev) => ({ ...prev, open: false })); // close snackbar!
+      setBaseBranch(pendingCompareBranch);
+      setCompareBranch("");
+      setCompareDialogOpen(true);
+      setCompareResult(null);
+      setCompareLoading(false);
+      setPendingCompareBranch(null);
+    }
+  }, [menuAnchorEl, pendingCompareBranch]);
 
   const environmentOptions = useMemo(
     () => ENV_OPTIONS.map((env) => env.toUpperCase()),
     [],
   );
-
-  // Snackbar notifications
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
 
   // Delete confirmations
   const [confirmDelete, setConfirmDelete] = useState({
@@ -235,6 +262,128 @@ function App() {
   const [branchLogLoading, setBranchLogLoading] = useState(false);
   const [branchLogList, setBranchLogList] = useState([]);
   const [branchLogError, setBranchLogError] = useState("");
+
+  const [compareToBranch, setCompareToBranch] = useState("");
+  const [compareCommits, setCompareCommits] = useState([]); // API data
+
+  // ... other hooks ...
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [baseBranch, setBaseBranch] = useState("");
+  const summary = `Selected: ${baseBranch}`;
+
+  const [compareBranch, setCompareBranch] = useState("");
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareResult, setCompareResult] = useState(null);
+
+  const [isOpeningCreateDialog, setIsOpeningCreateDialog] = useState(false);
+  const [showChangeset, setShowChangeset] = useState(false);
+
+  const handleOpenCreateDialog = () => {
+    if (isOpeningCreateDialog) return; // Ignore repeated calls quickly
+
+    setIsOpeningCreateDialog(true);
+    setCreateBranchDialogOpen(true);
+
+    // Reset flags after short delay (to allow dialog to open)
+    setTimeout(() => {
+      setIsOpeningCreateDialog(false);
+    }, 300); // adjust time as needed
+  };
+
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success", // or "error", "info", "warning"
+  });
+
+  const normalizeBranch = (row, idx) => ({
+    ...row,
+    id: row.name || idx,
+    name: row.name ?? "",
+    date: row.date ?? "",
+    createdAt: row.createdAt ?? row.createdat ?? "",
+    createdFrom: row.createdFrom ?? row["created from"] ?? "",
+  });
+
+  const openCompareDialog = (branchName) => {
+    // Don't close menu here
+    setBaseBranch(branchName);
+    setCompareBranch("");
+    setCompareDialogOpen(true);
+    setCompareResult(null);
+  };
+
+  function LoadingButton({ loading, onClick, children }) {
+    return (
+      <Button
+        variant="contained"
+        size="small"
+        disabled={loading}
+        sx={{
+          textTransform: "none",
+          fontWeight: 700,
+          fontSize: 16,
+          borderRadius: 3,
+          px: 2.5,
+          py: 1.25,
+          background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+          color: "#fff",
+          boxShadow: "0 4px 20px #f43f5e50", // Stronger, colored shadow
+          "&:hover": {
+            background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+            border: "3px solid #0ea5e9",
+            boxShadow: "0 6px 32px #0ea5e980",
+          },
+          boxSizing: "border-box",
+        }}
+        startIcon={
+          loading ? (
+            <CircularProgress color="inherit" size={16} />
+          ) : (
+            <SyncIcon />
+          )
+        }
+        onClick={onClick}
+      >
+        {loading ? `${children}ing...` : children}
+      </Button>
+    );
+  }
+
+  const handleCompareBranches = async () => {
+    setCompareLoading(true);
+    setCompareResult(null);
+    setSnackbar({ open: false, message: "", severity: "info" }); // if you want to close old notifications
+    try {
+      const resp = await fetch(
+        `${API_URL}/compare-branches?base=${encodeURIComponent(baseBranch)}&compare=${encodeURIComponent(compareBranch)}`,
+      );
+      const data = await resp.json();
+      if (data.success) {
+        setCompareResult(data);
+        setSnackbar({
+          open: true,
+          message: "Comparison successful.",
+          severity: "success",
+        });
+      } else {
+        setCompareResult({ error: data.error || "Unknown error" });
+        setSnackbar({
+          open: true,
+          message: data.error || "Comparison failed.",
+          severity: "error",
+        });
+      }
+    } catch (e) {
+      setCompareResult({ error: String(e.message) });
+      setSnackbar({
+        open: true,
+        message: String(e.message),
+        severity: "error",
+      });
+    }
+    setCompareLoading(false);
+  };
 
   const handleOpenMenu = (event, branchName) => {
     setMenuAnchorEl(event.currentTarget);
@@ -354,15 +503,15 @@ function App() {
       );
     },
   );
-  
- // Compute filtered suggestions based on current input
+
+  // Compute filtered suggestions based on current input
   const filteredSuggestions = suggestions.filter((opt) =>
     opt.toLowerCase().includes(search.toLowerCase()),
   );
 
   // Debounced fetching for suggestions
-  const debouncedFetchSuggestions = useCallback(
-    debounce(fetchSuggestions, 400),
+  const debouncedFetchSuggestions = useMemo(
+    () => debounce(fetchSuggestions, 400),
     [],
   );
 
@@ -451,16 +600,7 @@ function App() {
         } else {
           rows = [];
         }
-        setBranches(
-          rows.map((row, idx) => ({
-            ...row,
-            id: row.name || idx,
-            name: row.name ?? "",
-            date: row.date ?? "",
-            createdAt: row.createdAt ?? row.createdat ?? "",
-            createdFrom: row.createdFrom ?? row["created from"] ?? "",
-          })),
-        );
+        setBranches(rows.map((row, idx) => normalizeBranch(row, idx)));
       })
       .catch(() => {
         if (!active) return;
@@ -854,13 +994,7 @@ function App() {
         if (branchesResp.ok) {
           const branchesData = await branchesResp.json();
           setBranches(
-            (branchesData || []).map((row) => ({
-              ...row,
-              id: row.name,
-              name: row.name ?? "",
-              date: row.date ?? "",
-              createdAt: row.createdAt ?? "",
-            })),
+            (branchesData || []).map((row, idx) => normalizeBranch(row, idx)),
           );
         } else {
           setSnackbar({
@@ -931,6 +1065,56 @@ function App() {
     }
   };
 
+  const AppButton = ({
+    children,
+    onClick,
+    disabled = false,
+    startIcon = null,
+    loading = false,
+    color = "primary",
+    variant = "contained",
+    size = "small",
+    sx = {},
+  }) => {
+    // If loading is true, override startIcon with a spinner
+    const icon = loading ? (
+      <CircularProgress color="inherit" size={16} />
+    ) : (
+      startIcon
+    );
+
+    return (
+      <Button
+        variant={variant}
+        size={size}
+        disabled={disabled || loading}
+        onClick={onClick}
+        startIcon={icon}
+        color={color}
+        sx={{
+          textTransform: "none",
+          fontWeight: 700,
+          fontSize: 16,
+          borderRadius: 3,
+          px: 2.5,
+          py: 1.25,
+          background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+          color: "#fff",
+          boxShadow: "0 4px 20px #f43f5e50",
+          "&:hover": {
+            background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+            border: "3px solid #0ea5e9",
+            boxShadow: "0 6px 32px #0ea5e980",
+          },
+          boxSizing: "border-box",
+          ...sx,
+        }}
+      >
+        {loading ? `${children}ing...` : children}
+      </Button>
+    );
+  };
+
   const handleDeleteRemote = async () => {
     if (!selectedRemote) return;
     try {
@@ -948,13 +1132,18 @@ function App() {
       setSelectedRemote("");
       setRemoveRemoteDialogOpen(false);
 
-      setSnackbarMessage(`Remote '${selectedRemote}' removed successfully.`);
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
+      // Use consolidated snackbar state update
+      setSnackbar({
+        open: true,
+        message: `Remote '${selectedRemote}' removed successfully.`,
+        severity: "success",
+      });
     } catch (error) {
-      setSnackbarMessage(`Failed to remove remote: ${error.message}`);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      setSnackbar({
+        open: true,
+        message: `Failed to remove remote: ${error.message}`,
+        severity: "error",
+      });
     }
   };
 
@@ -1044,7 +1233,7 @@ function App() {
         </Box>
       ),
       renderCell: (params) =>
-        params.value && params.value.startsWith('DI-') ? (
+        params.value && params.value.startsWith("DI-") ? (
           <FloatingWhiteTooltip
             title="Tracking the requirements using the linked JIRA ticket."
             arrow
@@ -1110,7 +1299,7 @@ function App() {
           />
         ),
     },
-    
+
     {
       field: "name",
       headerName: "Branch Name",
@@ -1226,7 +1415,8 @@ function App() {
     },
     {
       field: "actions",
-      headerName: (
+      headerName: "Actions", // MUST be a string!
+      renderHeader: () => (
         <FloatingWhiteTooltip title="Use the actions menu to Checkout or Delete a branch.">
           <span
             style={{
@@ -1266,9 +1456,7 @@ function App() {
             <Menu
               anchorEl={menuAnchorEl}
               open={Boolean(menuAnchorEl)}
-              onClose={handleCloseMenu}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              onClose={handleMenuClose}
             >
               <MenuItem
                 onClick={() => {
@@ -1294,6 +1482,427 @@ function App() {
                 />
                 Delete
               </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose(); // Close the menu first
+                  setPendingCompareBranch(params.row.name); // Save pending branch
+                }}
+                sx={{
+                  color: "#0284c7",
+                  minWidth: 120,
+                  fontWeight: 700,
+                  "&:hover": {
+                    bgcolor: "#e0f2fe",
+                    color: "#0ea5e9",
+                  },
+                  textTransform: "none",
+                }}
+              >
+                <CompareArrowsIcon
+                  fontSize="small"
+                  sx={{ color: "#0ea5e9", mr: 1, verticalAlign: "middle" }}
+                />
+                Compare With...
+              </MenuItem>
+
+              <Dialog
+                open={compareDialogOpen}
+                onClose={() => setCompareDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+              >
+                <DialogTitle>Compare Branches</DialogTitle>
+                <DialogContent>
+                  <Box sx={{ mt: 1, mb: 2 }}>
+                    <Typography component="span" sx={{ fontWeight: 700 }}>
+                      Base:
+                    </Typography>
+                    {baseBranch ? (
+                      <Chip
+                        label={baseBranch}
+                        sx={{
+                          ml: 1,
+                          display: "inline-flex",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    ) : (
+                      <Typography component="span" sx={{ ml: 1 }}>
+                        -
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Autocomplete
+                    options={branches
+                      .map((b) => b.name)
+                      .filter((name) => name !== baseBranch)}
+                    value={compareBranch}
+                    onChange={(_, val) => setCompareBranch(val || "")}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Select branch to compare with"
+                      />
+                    )}
+                    fullWidth
+                    disableClearable
+                    sx={{ mb: 2 }}
+                  />
+
+                  {compareLoading && (
+                    <Box textAlign="center" py={2}>
+                      <CircularProgress />
+                    </Box>
+                  )}
+
+                  {/* Show/Hide Changed Files Table */}
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={showChangeset}
+                        onChange={(e) => setShowChangeset(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Show changed files (Files Changed Table)"
+                    sx={{ mt: 1 }}
+                  />
+
+                  {compareResult && (
+                    <Paper
+                      variant="outlined"
+                      sx={{ mt: 2, p: 2, bgcolor: "background.paper" }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ mb: 2, color: "#0284c7", fontWeight: 900 }}
+                      >
+                        <CompareArrowsIcon
+                          sx={{ mr: 1, verticalAlign: "middle" }}
+                        />{" "}
+                        Comparison Result
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          mb: 2,
+                          gap: 2,
+                        }}
+                      >
+                        <Chip
+                          label={`Base: ${baseBranch}`}
+                          color="primary"
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: "#0ea5e9",
+                            color: "#fff",
+                          }}
+                        />
+                        <Chip
+                          label={`Compared: ${compareBranch}`}
+                          color="success"
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: "#22c55e",
+                            color: "#fff",
+                          }}
+                        />
+                        <Chip
+                          label={`Files Changed: ${compareResult.stats?.length ?? 0}`}
+                          color="secondary"
+                        />
+                      </Box>
+                      <Divider sx={{ mb: 2 }} />
+
+                      {/* Commits only in base */}
+                      <Box sx={{ mb: 3 }}>
+                        <Alert
+                          icon={false}
+                          severity="info"
+                          sx={{
+                            fontWeight: 900,
+                            color: "#0ea5e9",
+                            mb: 1,
+                            bgcolor: "#e0f2fe",
+                          }}
+                        >
+                          Commits only in <b>{baseBranch}</b> (
+                          {compareResult.commits?.onlyInBase?.length ?? 0})
+                        </Alert>
+                        {compareResult?.commits?.onlyInBase?.length > 0 ? (
+                          <Box>
+                            {compareResult.commits.onlyInBase.map((c, i) => (
+                              <Paper
+                                key={c.hash || i}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  p: 1.1,
+                                  borderRadius: 2,
+                                  mb: 1,
+                                  bgcolor: i % 2 === 0 ? "#f3fafd" : "#e9f7fe",
+                                  borderLeft: "4px solid #0ea5e9",
+                                }}
+                                elevation={0}
+                              >
+                                <Avatar
+                                  sx={{
+                                    bgcolor: stringToColor(c.author),
+                                    width: 32,
+                                    height: 32,
+                                    mr: 1,
+                                  }}
+                                >
+                                  {c.author?.[0]?.toUpperCase() ?? "?"}
+                                </Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                      fontWeight: 700,
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {c.message}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: "#555", fontWeight: 500 }}
+                                  >
+                                    <span style={{ color: "#0181c2" }}>
+                                      {c.author}
+                                    </span>
+                                    {c.hash && (
+                                      <Tooltip title={c.hash}>
+                                        <Button
+                                          size="small"
+                                          sx={{
+                                            ml: 1,
+                                            color: "#94a3b8",
+                                            fontFamily: "monospace",
+                                            minWidth: 0,
+                                          }}
+                                          onClick={() =>
+                                            navigator.clipboard.writeText(
+                                              c.hash,
+                                            )
+                                          }
+                                        >
+                                          #{c.hash.slice(0, 7)}
+                                          <ContentCopyIcon
+                                            sx={{ fontSize: 18, ml: 0.5 }}
+                                          />
+                                        </Button>
+                                      </Tooltip>
+                                    )}
+                                  </Typography>
+                                </Box>
+                              </Paper>
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#64748b", pl: 1.5 }}
+                          >
+                            None
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Commits only in compare */}
+                      <Box sx={{ mb: 3 }}>
+                        <Alert
+                          icon={false}
+                          severity="success"
+                          sx={{
+                            fontWeight: 900,
+                            color: "#22c55e",
+                            mb: 1,
+                            bgcolor: "#d3fbe9",
+                          }}
+                        >
+                          Commits only in <b>{compareBranch}</b> (
+                          {compareResult.commits?.onlyInCompare?.length ?? 0})
+                        </Alert>
+                        {compareResult?.commits?.onlyInCompare?.length > 0 ? (
+                          <Box>
+                            {compareResult.commits.onlyInCompare.map((c, i) => (
+                              <Paper
+                                key={c.hash || i}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  p: 1.1,
+                                  borderRadius: 2,
+                                  mb: 1,
+                                  bgcolor: i % 2 === 0 ? "#f6fcf6" : "#e9fdeb",
+                                  borderLeft: "4px solid #22c55e",
+                                }}
+                                elevation={0}
+                              >
+                                <Avatar
+                                  sx={{
+                                    bgcolor: stringToColor(c.author),
+                                    width: 32,
+                                    height: 32,
+                                    mr: 1,
+                                  }}
+                                >
+                                  {c.author?.[0]?.toUpperCase() ?? "?"}
+                                </Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                      fontWeight: 700,
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {c.message}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: "#555", fontWeight: 500 }}
+                                  >
+                                    <span style={{ color: "#0e8c3f" }}>
+                                      {c.author}
+                                    </span>
+                                    {c.hash && (
+                                      <Tooltip title={c.hash}>
+                                        <Button
+                                          size="small"
+                                          sx={{
+                                            ml: 1,
+                                            color: "#166534",
+                                            fontFamily: "monospace",
+                                            minWidth: 0,
+                                          }}
+                                          onClick={() =>
+                                            navigator.clipboard.writeText(
+                                              c.hash,
+                                            )
+                                          }
+                                        >
+                                          #{c.hash.slice(0, 7)}
+                                          <ContentCopyIcon
+                                            sx={{ fontSize: 18, ml: 0.5 }}
+                                          />
+                                        </Button>
+                                      </Tooltip>
+                                    )}
+                                  </Typography>
+                                </Box>
+                              </Paper>
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#64748b", pl: 1.5 }}
+                          >
+                            None
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Files Changed Table (conditional on showChangeset) */}
+                      {showChangeset && (
+                        <>
+                          {compareResult.stats?.length > 0 ? (
+                            <Paper
+                              variant="outlined"
+                              sx={{ mb: 1, p: 1, bgcolor: "#f4f6fb" }}
+                            >
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 700, mb: 1 }}
+                              >
+                                Files Changed ({compareResult.stats.length})
+                              </Typography>
+                              <Box
+                                component="table"
+                                sx={{ width: "100%", fontSize: 15 }}
+                              >
+                                <thead>
+                                  <tr style={{ color: "#64748b" }}>
+                                    <th align="left">File</th>
+                                    <th align="right">+ Added</th>
+                                    <th align="right">– Deleted</th>
+                                    <th align="right">Net</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {compareResult.stats.map((row, idx) => (
+                                    <tr key={row.file}>
+                                      <td style={{ wordBreak: "break-all" }}>
+                                        {row.file}
+                                      </td>
+                                      <td
+                                        align="right"
+                                        style={{ color: "#16a34a" }}
+                                      >
+                                        +{row.added}
+                                      </td>
+                                      <td
+                                        align="right"
+                                        style={{ color: "#dc2626" }}
+                                      >
+                                        -{row.deleted}
+                                      </td>
+                                      <td
+                                        align="right"
+                                        style={{
+                                          fontWeight: 700,
+                                          color:
+                                            row.net > 0
+                                              ? "#166534"
+                                              : row.net < 0
+                                                ? "#dc2626"
+                                                : "#64748b",
+                                        }}
+                                      >
+                                        {row.net}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Box>
+                            </Paper>
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              sx={{ color: "#64748b", pl: 1.5 }}
+                            >
+                              No files changed.
+                            </Typography>
+                          )}
+                        </>
+                      )}
+                    </Paper>
+                  )}
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => setCompareDialogOpen(false)}
+                    color="secondary"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={!baseBranch || !compareBranch || compareLoading}
+                    onClick={handleCompareBranches}
+                  >
+                    {compareLoading ? "Comparing..." : "Compare"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </Menu>
           )}
         </Box>
@@ -1363,110 +1972,35 @@ function App() {
           <Box
             sx={{ display: "flex", gap: { xs: 1, sm: 2, position: "sticky" } }}
           >
-            <Button
-              variant="contained"
-              size="small"
+            <AppButton
               startIcon={<AddIcon />}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50", // <-- Stronger, colored shadow
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-
-                  border: "3px solid #0ea5e9",
-                  boxShadow: "0 6px 32px #0ea5e980",
-                },
-                // Subtle glow for further pop
-                boxSizing: "border-box",
-              }}
               onClick={() => {
                 setCreateBranchDialogOpen(true);
                 setCreateBranchRemote("");
                 setCreateBranchTarget("");
                 setCreateBranchName("");
               }}
+              disabled={isOpeningCreateDialog}
             >
               Create
-            </Button>
+            </AppButton>
 
-            <Button
-              variant="contained"
-              size="small"
-              disabled={isPulling}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50", // <-- Stronger, colored shadow
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-
-                  border: "3px solid #0ea5e9",
-                  boxShadow: "0 6px 32px #0ea5e980",
-                },
-                // Subtle glow for further pop
-                boxSizing: "border-box",
-              }}
-              startIcon={
-                isPulling ? (
-                  <CircularProgress color="inherit" size={16} />
-                ) : (
-                  <SyncIcon />
-                )
-              }
+            <AppButton
+              startIcon={<SyncIcon />}
+              loading={isPulling}
               onClick={handlePull}
+              disabled={isPulling}
             >
-              {isPulling ? "Pulling..." : "Pull"}
-            </Button>
+              Pull
+            </AppButton>
 
-            <Button
-              variant="contained"
-              disabled={isStashing}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50", // <-- Stronger, colored shadow
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                  border: "3px solid #0ea5e9",
-                  boxShadow: "0 6px 32px #0ea5e980",
-                },
-                // Subtle glow for further pop
-                boxSizing: "border-box",
-              }}
-              startIcon={
-                isStashing ? (
-                  <CircularProgress color="inherit" size={16} />
-                ) : null
-              }
+            <AppButton
+              loading={isStashing}
               onClick={handleStashChanges}
+              disabled={isStashing}
             >
-              {isStashing ? "Stashing..." : "Stash"}
-            </Button>
+              Stash
+            </AppButton>
             <FloatingWhiteTooltip
               title={
                 lastEnvKey && ENV_LABELS[lastEnvKey]
@@ -1497,188 +2031,101 @@ function App() {
               }}
             >
               <div style={{ display: "inline-block" }}>
-                <Button
-                  variant="contained"
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: 700,
-                    fontSize: 16,
-                    borderRadius: 3,
-                    px: 2.5,
-                    py: 1.25,
-                    background:
-                      "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
-                    color: "#fff",
-                    boxShadow: "0 4px 20px #f43f5e50",
-                    "&:hover": {
-                      background:
-                        "linear-gradient(90deg, #2563eb 80%, #0ea5e9 100%)",
-                      border: "3px solid #0ea5e9",
-                      boxShadow: "0 6px 32px #0ea5e980",
-                    },
-                    boxSizing: "border-box",
-                  }}
-                  onClick={handleOpenEnvSwitcher}
-                >
-                  Switch
-                </Button>
+                <AppButton onClick={handleOpenEnvSwitcher}>Switch</AppButton>
               </div>
             </FloatingWhiteTooltip>
+            <div style={{ display: "flex", gap: "18px", flexWrap: "wrap" }}>
+              <AppButton
+                startIcon={<SettingsInputComponentIcon />}
+                onClick={handleStartService}
+              >
+                Start
+              </AppButton>
+              <Dialog
+                open={addRemoteDialogOpen}
+                onClose={() => {
+                  setAddRemoteDialogOpen(false);
+                  setNewRemoteName("");
+                  setNewRemoteUrl("");
+                }}
+              >
+                <DialogTitle>Add Git Remote</DialogTitle>
+                <DialogContent>
+                  <TextField
+                    label="Remote Name"
+                    value={newRemoteName}
+                    onChange={(e) => setNewRemoteName(e.target.value)}
+                    fullWidth
+                    margin="normal"
+                    autoFocus
+                    required
+                  />
+                  <TextField
+                    label="Remote URL"
+                    value={newRemoteUrl}
+                    onChange={(e) => setNewRemoteUrl(e.target.value)}
+                    fullWidth
+                    margin="normal"
+                    required
+                  />
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => {
+                      setAddRemoteDialogOpen(false);
+                      setNewRemoteName("");
+                      setNewRemoteUrl("");
+                    }}
+                    color="secondary"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleAddRemote}
+                    color="primary"
+                    variant="contained"
+                    disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
+                  >
+                    {isAddingRemote ? "Adding..." : "Create"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
 
-            <Button
-              variant="contained"
-              startIcon={<SettingsInputComponentIcon />} // Or choose another icon if desired
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50", // <-- Stronger, colored shadow
-                "&:hover": {
+              <AppButton
+                onClick={() => setAutomationDialogOpen(true)}
+                startIcon={<SettingsInputComponentIcon />}
+              >
+                Run Specs
+              </AppButton>
+              <AppButton
+                color="secondary"
+                onClick={() => setAddRemoteDialogOpen(true)}
+              >
+                Add Remote
+              </AppButton>
+
+              <AppButton
+                sx={{
+                  minWidth: 150,
+                  boxShadow: "0 2px 12px #0ea5e930",
+                  borderRadius: 2,
+                  letterSpacing: 1,
                   background:
-                    "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                  boxShadow: "0 6px 32px #0ea5e980",
-                },
-                // Subtle glow for further pop
-                boxSizing: "border-box",
-              }}
-              onClick={handleStartService} // Function defined below
-            >
-              Start
-            </Button>
-            <Dialog
-              open={addRemoteDialogOpen}
-              onClose={() => {
-                setAddRemoteDialogOpen(false);
-                setNewRemoteName("");
-                setNewRemoteUrl("");
-              }}
-            >
-              <DialogTitle>Add Git Remote</DialogTitle>
-              <DialogContent>
-                <TextField
-                  label="Remote Name"
-                  value={newRemoteName}
-                  onChange={(e) => setNewRemoteName(e.target.value)}
-                  fullWidth
-                  margin="normal"
-                  autoFocus
-                  required
-                />
-                <TextField
-                  label="Remote URL"
-                  value={newRemoteUrl}
-                  onChange={(e) => setNewRemoteUrl(e.target.value)}
-                  fullWidth
-                  margin="normal"
-                  required
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => {
-                    setAddRemoteDialogOpen(false);
-                    setNewRemoteName("");
-                    setNewRemoteUrl("");
-                  }}
-                  color="secondary"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddRemote}
-                  color="primary"
-                  variant="contained"
-                  disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
-                >
-                  {isAddingRemote ? "Adding..." : "Create"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+                    "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
+                    color: "#fff",
+                    border: "2px solid #0ea5e9",
+                    boxShadow: "0 4px 20px #f43f5e50",
+                  },
+                }}
+                onClick={handleOpenRemoveRemote}
+              >
+                Remove Remote
+              </AppButton>
+            </div>
 
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<SettingsInputComponentIcon />}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50",
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                  boxShadow: "0 6px 32px #0ea5e980",
-                },
-                boxSizing: "border-box",
-              }}
-              onClick={() => setAutomationDialogOpen(true)}
-            >
-              Run Specs
-            </Button>
-
-            <Button
-              variant="contained"
-              color="secondary"
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 16,
-                borderRadius: 3,
-                px: 2.5,
-                py: 1.25,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 100%)",
-                color: "#fff",
-                boxShadow: "0 4px 20px #f43f5e50",
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                  border: "3px solid #0ea5e9",
-                  boxShadow: "0 4px 20px #f43f5e50",
-                },
-                boxSizing: "border-box",
-              }}
-              onClick={() => setAddRemoteDialogOpen(true)} // <-- This opens the dialog
-            >
-              Add Remote
-            </Button>
-
-            <Button
-              variant="contained"
-              sx={{
-                textTransform: "none",
-                background: "linear-gradient(90deg,#0ea5e9 90%,#38bdf8 100%)",
-                color: "#fff",
-                boxShadow: "0 2px 12px #0ea5e930",
-                borderRadius: 2,
-                fontWeight: 700,
-                fontSize: 16,
-                px: 3,
-                py: 1,
-                letterSpacing: 1,
-                minWidth: 150,
-
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #2563eb 80%, #f43f5e 100%)",
-                  color: "#fff",
-                  border: "2px solid #0ea5e9",
-                  boxShadow: "0 4px 20px #f43f5e50",
-                },
-              }}
-              onClick={handleOpenRemoveRemote}
-            >
-              Remove Remote
-            </Button>
             <Dialog
               open={removeRemoteDialogOpen}
               onClose={() => setRemoveRemoteDialogOpen(false)}
@@ -1768,19 +2215,20 @@ function App() {
                 </Button>
               </DialogActions>
             </Dialog>
-
             <Snackbar
-              open={snackbarOpen}
-              autoHideDuration={4000}
-              onClose={() => setSnackbarOpen(false)}
+              open={snackbar.open}
+              onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+              autoHideDuration={3000}
               anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
             >
               <Alert
-                onClose={() => setSnackbarOpen(false)}
-                severity={snackbarSeverity}
+                onClose={() =>
+                  setSnackbar((prev) => ({ ...prev, open: false }))
+                }
+                severity={snackbar.severity}
                 sx={{ width: "100%" }}
               >
-                {snackbarMessage}
+                {snackbar.message}
               </Alert>
             </Snackbar>
 
@@ -2434,203 +2882,203 @@ function App() {
             mb: 3,
           }}
         >
-
-            <Box sx={{ overflowX: "auto", position: "sticky" }}>
-              <DataGrid
-                rows={branches}
-                columns={columns}
-                pageSize={2}
-                pagination
-                onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
-                disableColumnMenu
-                disableColumnSelector
-                disableRowSelectionOnClick
-                selectionModel={selectionModel}
-                onRowSelectionModelChange={setSelectionModel}
-                loading={branches.length === 0 && suggestions.length === 0}
-                rowsPerPageOptions={[15, 30, 50]}
-                getRowId={(row) => row.id}
-                // checkboxSelection
-                sx={{
-                  fontSize: 16,
-                  bgcolor: "#f0f9ff",
-                  borderRadius: 2,
-                  border: "none",
-                  "& .MuiDataGrid-row:hover": { bgcolor: "#d7f0fe" },
-                  "& .MuiDataGrid-checkboxInput": { color: "#0ea5e9" },
-                  "& .MuiDataGrid-cell": { fontWeight: 400 },
-                  "& .MuiDataGrid-columnHeaders": {
-                    bgcolor: "#e0f2fe",
-                    borderBottom: "2.5px solid #0ea5e9",
-                    fontWeight: 700,
-                    fontSize: 17,
-                  },
-                }}
-                components={{
-                  LoadingOverlay,
-                  NoRowsOverlay: () => (
-                    <Typography sx={{ mt: 6, fontSize: 22, color: "#8c8c8c" }}>
-                      No data to display.
-                    </Typography>
-                  ),
-                }}
-              />
-            </Box>
-            <Typography sx={{ mt: 2, fontSize: 14, color: "#64748b" }}>
-              Showing {pageSize} per page | {branches.length} branches
-            </Typography>
-            <Dialog
-              open={branchLogDialogOpen}
-              onClose={() => setBranchLogDialogOpen(false)}
-              maxWidth="md"
-              PaperProps={{
-                sx: {
-                  bgcolor: "#fcfeff",
-                  borderRadius: 4,
-                  p: 2,
-                  minWidth: { xs: "95vw", sm: 540 },
+          <Box sx={{ overflowX: "auto", position: "sticky" }}>
+            <DataGrid
+              rows={branches}
+              columns={columns}
+              checkboxSelection
+              pageSize={2}
+              pagination
+              onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+              disableColumnMenu
+              disableColumnSelector
+              disableRowSelectionOnClick
+              selectionModel={selectionModel}
+              onRowSelectionModelChange={setSelectionModel}
+              loading={branches.length === 0 && suggestions.length === 0}
+              rowsPerPageOptions={[15, 30, 50]}
+              getRowId={(row) => row.id}
+              // checkboxSelection
+              sx={{
+                fontSize: 16,
+                bgcolor: "#f0f9ff",
+                borderRadius: 2,
+                border: "none",
+                "& .MuiDataGrid-row:hover": { bgcolor: "#d7f0fe" },
+                "& .MuiDataGrid-checkboxInput": { color: "#0ea5e9" },
+                "& .MuiDataGrid-cell": { fontWeight: 400 },
+                "& .MuiDataGrid-columnHeaders": {
+                  bgcolor: "#e0f2fe",
+                  borderBottom: "2.5px solid #0ea5e9",
+                  fontWeight: 700,
+                  fontSize: 17,
                 },
               }}
-            >
-              <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
-                Commit History ─ {currentBranch}
-              </DialogTitle>
-              <DialogContent sx={{ maxHeight: 500, overflowY: "auto" }}>
-  {branchLogLoading ? (
-    <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
-      <CircularProgress />
-    </Box>
-  ) : branchLogError ? (
-    <Alert severity="error">{branchLogError}</Alert>
-  ) : branchLogList.length === 0 ? (
-    <Typography color="text.secondary" sx={{ my: 2 }}>
-      No commits found.
-    </Typography>
-  ) : (
-    <Box>
-      {branchLogList.map((log, idx) => (
-        <Paper
-          key={log.commit + idx}
-          sx={{
-            my: 2,
-            p: 2,
-            bgcolor: "#e0f2fe",
-            boxShadow: "none",
-            borderLeft: "6px solid #0ea5e9",
-          }}
-        >
-          {/* --- HERE IS THE CHANGED PART --- */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              mb: 0.6,
-              flexWrap: "wrap",
-            }}
-          >
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{
-                  color: "#2563eb",
-                  fontWeight: 700,
-                  display: "inline",
-                }}
-              >
-                {log.message}
-              </Typography>
-              {/* Ticket links block */}
-              {log.tickets && log.tickets.length > 0 && (
-                <span style={{ marginLeft: 10 }}>
-                  {log.tickets.map(ticket => (
-                    <a
-                      key={ticket}
-                      href={`https://track.akamai.com/jira/browse/${ticket}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: "#fff",
-                        background: "#2563eb",
-                        borderRadius: "7px",
-                        padding: "1px 7px",
-                        marginRight: "8px",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        textDecoration: "none",
-                        verticalAlign: "middle"
-                      }}
-                    >
-                      {ticket}
-                    </a>
-                  ))}
-                </span>
-              )}
-            </Box>
-            <Chip
-              label={log.date}
-              size="small"
-              sx={{
-                ml: 1,
-                bgcolor: "#e0e7ff",
-                color: "#334155",
-                fontWeight: 700,
+              components={{
+                LoadingOverlay,
+                NoRowsOverlay: () => (
+                  <Typography sx={{ mt: 6, fontSize: 22, color: "#8c8c8c" }}>
+                    No data to display.
+                  </Typography>
+                ),
               }}
             />
           </Box>
-          {/* rest of your Paper stays the same */}
-          <Box
-            sx={{
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              flexWrap: "wrap",
+          <Typography sx={{ mt: 2, fontSize: 14, color: "#64748b" }}>
+            Showing {pageSize} per page | {branches.length} branches
+          </Typography>
+          <Dialog
+            open={branchLogDialogOpen}
+            onClose={() => setBranchLogDialogOpen(false)}
+            maxWidth="md"
+            PaperProps={{
+              sx: {
+                bgcolor: "#fcfeff",
+                borderRadius: 4,
+                p: 2,
+                minWidth: { xs: "95vw", sm: 540 },
+              },
             }}
           >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-              }}
-            >
-              <span style={{ color: "#6b7280" }}>Commit:</span>
-              <code style={{ color: "#0284c7", fontSize: 15 }}>
-                {log.commit.slice(0, 8)}…
-              </code>
-              <Tooltip title="Copy commit id">
-                <IconButton
-                  onClick={() => handleCopyCommit(log.commit)}
-                  size="small"
-                  sx={{ ml: 0.5, color: "#0891b2" }}
-                >
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-            <Box>
-              <span style={{ color: "#6b7280" }}>Author:</span>
-              <span style={{ fontWeight: 500, marginLeft: 6 }}>
-                {log.author}
-              </span>
-            </Box>
-          </Box>
-        </Paper>
-      ))}
-    </Box>
-  )}
-</DialogContent>
+            <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
+              Commit History ─ {currentBranch}
+            </DialogTitle>
+            <DialogContent sx={{ maxHeight: 500, overflowY: "auto" }}>
+              {branchLogLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : branchLogError ? (
+                <Alert severity="error">{branchLogError}</Alert>
+              ) : branchLogList.length === 0 ? (
+                <Typography color="text.secondary" sx={{ my: 2 }}>
+                  No commits found.
+                </Typography>
+              ) : (
+                <Box>
+                  {branchLogList.map((log, idx) => (
+                    <Paper
+                      key={log.commit + idx}
+                      sx={{
+                        my: 2,
+                        p: 2,
+                        bgcolor: "#e0f2fe",
+                        boxShadow: "none",
+                        borderLeft: "6px solid #0ea5e9",
+                      }}
+                    >
+                      {/* --- HERE IS THE CHANGED PART --- */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          mb: 0.6,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              color: "#2563eb",
+                              fontWeight: 700,
+                              display: "inline",
+                            }}
+                          >
+                            {log.message}
+                          </Typography>
+                          {/* Ticket links block */}
+                          {log.tickets && log.tickets.length > 0 && (
+                            <span style={{ marginLeft: 10 }}>
+                              {log.tickets.map((ticket) => (
+                                <a
+                                  key={ticket}
+                                  href={`https://track.akamai.com/jira/browse/${ticket}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: "#fff",
+                                    background: "#2563eb",
+                                    borderRadius: "7px",
+                                    padding: "1px 7px",
+                                    marginRight: "8px",
+                                    fontWeight: 700,
+                                    fontSize: 13,
+                                    textDecoration: "none",
+                                    verticalAlign: "middle",
+                                  }}
+                                >
+                                  {ticket}
+                                </a>
+                              ))}
+                            </span>
+                          )}
+                        </Box>
+                        <Chip
+                          label={log.date}
+                          size="small"
+                          sx={{
+                            ml: 1,
+                            bgcolor: "#e0e7ff",
+                            color: "#334155",
+                            fontWeight: 700,
+                          }}
+                        />
+                      </Box>
+                      {/* rest of your Paper stays the same */}
+                      <Box
+                        sx={{
+                          fontSize: 14,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <span style={{ color: "#6b7280" }}>Commit:</span>
+                          <code style={{ color: "#0284c7", fontSize: 15 }}>
+                            {log.commit.slice(0, 8)}…
+                          </code>
+                          <Tooltip title="Copy commit id">
+                            <IconButton
+                              onClick={() => handleCopyCommit(log.commit)}
+                              size="small"
+                              sx={{ ml: 0.5, color: "#0891b2" }}
+                            >
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                        <Box>
+                          <span style={{ color: "#6b7280" }}>Author:</span>
+                          <span style={{ fontWeight: 500, marginLeft: 6 }}>
+                            {log.author}
+                          </span>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  ))}
+                </Box>
+              )}
+            </DialogContent>
 
-              <DialogActions>
-                <Button
-                  onClick={() => setBranchLogDialogOpen(false)}
-                  variant="outlined"
-                  sx={{ fontWeight: 700, borderRadius: 2 }}
-                >
-                  Close
-                </Button>
-              </DialogActions>
-            </Dialog>
+            <DialogActions>
+              <Button
+                onClick={() => setBranchLogDialogOpen(false)}
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Paper>
         {/* Confirm Delete Selected Snackbar */}
         {/* Confirm Delete Selected Dialog */}

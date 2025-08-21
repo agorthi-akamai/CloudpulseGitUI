@@ -894,6 +894,106 @@ app.get('/list-specs', async (req, res) => {
   }
 });
 
+// Put this outside the route handler, at the top of your server file
+const compareBranchesCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes, adjust as needed
+
+function getCompareCacheKey(base, compare, maxCommits, maxFiles) {
+  // Key must change if params change
+  return `${base}|${compare}|${maxCommits}|${maxFiles}`;
+}
+
+/** /compare-branches?base=branch1&compare=branch2 */
+app.get('/compare-branches', async (req, res) => {
+  try {
+    const base = (req.query.base || '').toString();
+    const compare = (req.query.compare || '').toString();
+    const maxCommits = 100, maxFiles = 200;
+
+    if (!base || !compare) {
+      return res.status(400).json({ success: false, error: 'Both base and compare branches are required.' });
+    }
+    if (!/^[\w\-\/]+$/.test(base) || !/^[\w\-\/]+$/.test(compare)) {
+      return res.status(400).json({ success: false, error: 'Invalid branch name(s).' });
+    }
+
+    const cacheKey = getCompareCacheKey(base, compare, maxCommits, maxFiles);
+
+    // Check cache
+    const now = Date.now();
+    const cached = compareBranchesCache.get(cacheKey);
+    if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+      return res.json(cached.data);
+    }
+
+    // ... [rest of your logic unchanged] ...
+    // (Put your git logic here, then produce the result object to return)
+
+    // Your parsing, git logic
+    const parseGraphLog = (stdout, branchName) =>
+      stdout.trim().split('\n').filter(Boolean).map(line => {
+        const match = line.match(/^([\|\*\\\/\s]*)([0-9a-f]{40})\|(.+?)\|(.+?)\|(.+)$/);
+        if (match) {
+          const [, graph, hash, author, date, message] = match;
+          return {
+            graph: graph.trim(),
+            hash,
+            author,
+            date: new Date(date).toISOString(),
+            message,
+            branch: branchName
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+    const logCmdCompare = `git log ${shellEscapeArg(base)}..${shellEscapeArg(compare)} --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s" --graph -n ${maxCommits}`;
+    const { stdout: outCompare } = await execGit(logCmdCompare, repoPath);
+    const commitsCompare = parseGraphLog(outCompare, compare);
+
+    const logCmdBase = `git log ${shellEscapeArg(compare)}..${shellEscapeArg(base)} --date=format:'%b %d %Y' --pretty=format:"%H|%an|%ad|%s" --graph -n ${maxCommits}`;
+    const { stdout: outBase } = await execGit(logCmdBase, repoPath);
+    const commitsBase = parseGraphLog(outBase, base);
+
+    const diffCmd = `git diff --numstat ${shellEscapeArg(base)}..${shellEscapeArg(compare)}`;
+    const { stdout: diffOut } = await execGit(diffCmd, repoPath);
+    const stats = diffOut.trim()
+      .split('\n')
+      .filter(Boolean)
+      .slice(0, maxFiles)
+      .map(line => {
+        const [added, deleted, file] = line.split(/\s+/);
+        return {
+          file,
+          added: added === '-' ? 0 : parseInt(added, 10),
+          deleted: deleted === '-' ? 0 : parseInt(deleted, 10)
+        };
+      });
+
+    const result = {
+      success: true,
+      base,
+      compare,
+      commits: {
+        onlyInBase: commitsBase,
+        onlyInCompare: commitsCompare,
+        onlyInBaseTruncated: commitsBase.length === maxCommits,
+        onlyInCompareTruncated: commitsCompare.length === maxCommits,
+      },
+      stats,
+      statsTruncated: stats.length === maxFiles
+    };
+
+    // Store in cache
+    compareBranchesCache.set(cacheKey, { timestamp: now, data: result });
+
+    res.json(result);
+  } catch (err) {
+    console.error('/compare-branches error:', err.message || err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to compare branches' });
+  }
+});
+
 // Fallback root
 app.get('/', (req, res) => res.json({ success: true, message: 'Cloudpulse Git UI Backend running' }));
 
