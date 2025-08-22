@@ -961,6 +961,34 @@ app.post('/unstash', async (req, res) => {
 });
 
 
+// Change this to your actual repo path
+
+app.get('/stashes/search/:text', (req, res) => {
+  const search = req.params.text;
+  if (!search) {
+    return res.status(400).json({ success: false, error: 'Search text required.' });
+  }
+  exec('git stash list', { cwd: repoPath }, (err, stdout, stderr) => {
+    // If no stashes, or no match, just return empty list
+    if (err && !stdout) {
+      return res.json({ success: true, stashes: [] });
+    }
+    const lines = (stdout || '').split('\n');
+    // Contains check (just like grep)
+    const stashes = lines
+      .filter(line => line.includes(search))
+      .filter(Boolean)
+      .map(line => {
+        const [ref, ...rest] = line.split(":");
+        return {
+          ref: (ref || '').trim(),
+          message: (rest.join(":") || '').trim()
+        };
+      });
+    res.json({ success: true, stashes });
+  });
+});
+
 
 /** /current-branch */
 app.get('/current-branch', async (req, res) => {

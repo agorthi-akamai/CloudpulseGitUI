@@ -184,6 +184,12 @@ const [selectedRemote, setSelectedRemote] = useState("");
   const [isServerRunning, setIsServerRunning] = useState(false);
   const [serverOutputOpen, setServerOutputOpen] = useState(true);
   
+
+const [stashAction, setStashAction] = useState("stash"); // "stash" or "unstash"
+const [unstashList, setUnstashList] = useState([]); // {ref, message}[]
+const [isStashListLoading, setIsStashListLoading] = useState(false);
+const [selectedUnstashMsg, setSelectedUnstashMsg] = useState("");
+
   
 
   // Instead of opening and closing in same event tick:
@@ -699,9 +705,31 @@ const closeStashDialog = () => setStashDialogOpen(false);
 
 const openStashDialog = () => {
   const suggestedMessage = getDefaultStashMessage(currentBranch || "branch");
-  setStashMessage(suggestedMessage);
+
   setStashDialogOpen(true);
+  setStashAction("stash");
+  setStashMessage(suggestedMessage);
+  setUnstashList([]);
+  setSelectedUnstashMsg("");
 };
+
+const loadUnstashList = async () => {
+  setIsStashListLoading(true);
+  setSelectedUnstashMsg(null); // always reset here
+  try {
+    // Use search endpoint instead of old name-based endpoint
+    const resp = await fetch(`${API_URL}/stashes/search/${encodeURIComponent(currentBranch)}`);
+    const data = await resp.json();
+    setUnstashList(Array.isArray(data.stashes) ? data.stashes : []);
+  } catch {
+    setUnstashList([]);
+  }
+  setIsStashListLoading(false);
+};
+
+
+
+
 
 const handleConfirmStash = async () => {
   await handleStashChanges(stashMessage);
@@ -1938,7 +1966,7 @@ const unstashChangesApi = async (stashMessage) => {
               Pull
             </AppButton>
 
-            <AppButton
+   <AppButton
   startIcon={<SettingsBackupRestoreIcon />}
   loading={isStashing}
   onClick={openStashDialog}
@@ -1948,33 +1976,144 @@ const unstashChangesApi = async (stashMessage) => {
   Stash
 </AppButton>
 
-<Dialog open={stashDialogOpen} onClose={closeStashDialog} maxWidth="sm" fullWidth>
-  <DialogTitle>Stash Changes</DialogTitle>
+<Dialog open={stashDialogOpen} onClose={() => setStashDialogOpen(false)} maxWidth="xs" fullWidth>
+  <DialogTitle>Stash Actions</DialogTitle>
   <DialogContent>
+    <RadioGroup
+      row
+      value={stashAction}
+      onChange={e => {
+        const action = e.target.value;
+        setStashAction(action);
+        if (action === "unstash") {
+          setSelectedUnstashMsg(null); // Clear prior selection!
+          loadUnstashList();
+        }
+      }}
+      sx={{ mb: 2 }}
+    >
+      <FormControlLabel value="stash" control={<Radio />} label="Stash" />
+      <FormControlLabel value="unstash" control={<Radio />} label="Unstash" />
+    </RadioGroup>
+
+
+    {stashAction === "stash" && (
+      <TextField
+        autoFocus
+        margin="dense"
+        label="Stash Message"
+        type="text"
+        fullWidth
+        value={stashMessage}
+        onChange={e => setStashMessage(e.target.value)}
+        placeholder='e.g. "WIP: fixing login bug"'
+      />
+    )}
+
+
+    {stashAction === "unstash" && (
+      <>
+       <Autocomplete
+  loading={isStashListLoading}
+  options={unstashList}
+  getOptionLabel={option => (option && option.message ? option.message : '')}
+  value={selectedUnstashMsg}
+  onChange={(_, val) => setSelectedUnstashMsg(val)}
+  renderInput={params => (
     <TextField
-      autoFocus
+      {...params}
+      label="Select stash message to pop"
       margin="dense"
-      label="Stash Message"
-      type="text"
       fullWidth
-      value={stashMessage}
-      onChange={(e) => setStashMessage(e.target.value)}
-      placeholder='e.g. "WIP: fixing login bug"'
+      InputProps={{
+        ...params.InputProps,
+        endAdornment: (
+          <>
+            {isStashListLoading ? <CircularProgress color="primary" size={20} /> : null}
+            {params.InputProps.endAdornment}
+          </>
+        ),
+      }}
     />
+  )}
+  noOptionsText="No stashes for this branch"
+  disabled={isStashListLoading || unstashList.length === 0}
+/>
+
+
+        {!isStashListLoading && unstashList.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: "center" }}>
+            No stashes found for this branch.
+          </Typography>
+        )}
+      </>
+    )}
   </DialogContent>
   <DialogActions>
-    <Button onClick={closeStashDialog}>Cancel</Button>
     <Button
-      onClick={handleConfirmStash}
+      onClick={() => setStashDialogOpen(false)}
+      disabled={isStashListLoading}
+    >Cancel</Button>
+    <Button
       variant="contained"
-      disabled={isStashing}
+      onClick={async () => {
+        setIsStashing(true);
+        try {
+          if (stashAction === "stash") {
+            const resp = await fetch(`${API_URL}/stash`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ stashMessage }),
+            });
+            const data = await resp.json();
+            setSnackbar({
+              open: true,
+              message: data.message || (data.success ? "Stashed!" : "Failed to stash"),
+              severity: data.success ? "success" : "error"
+            });
+          } else if (stashAction === "unstash") {
+            if (!selectedUnstashMsg) {
+              setSnackbar({
+                open: true,
+                message: "Please select a stash to pop.",
+                severity: "error"
+              });
+              setIsStashing(false);
+              return;
+            }
+            // You can POST either .message or .ref depending on your API design
+            const resp = await fetch(`${API_URL}/unstash`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: selectedUnstashMsg.message }),
+            });
+            const data = await resp.json();
+            setSnackbar({
+              open: true,
+              message: data.message || (data.success ? "Unstashed!" : "Failed to unstash"),
+              severity: data.success ? "success" : "error"
+            });
+          }
+        } catch (err) {
+          setSnackbar({
+            open: true,
+            message: err.message || "Error",
+            severity: "error"
+          });
+        }
+        setIsStashing(false);
+        setStashDialogOpen(false);
+      }}
+      disabled={
+        isStashing ||
+        (stashAction === "stash" && !stashMessage.trim()) ||
+        (stashAction === "unstash" && !selectedUnstashMsg)
+      }
     >
-      Confirm
+      {isStashing ? "Processing..." : "Confirm"}
     </Button>
   </DialogActions>
 </Dialog>
-
-
 
             <FloatingWhiteTooltip
               title={
