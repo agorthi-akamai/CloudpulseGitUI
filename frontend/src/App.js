@@ -1085,6 +1085,11 @@ const getDefaultStashMessage = (branchName) => {
       });
     }
   };
+  function extractUserStashMessage(stashMessage, branchName) {
+    const prefix = `On ${branchName}: `;
+    return stashMessage.startsWith(prefix) ? stashMessage.slice(prefix.length) : stashMessage;
+  }
+  
 
   const handleCheckout = async (branchName) => {
     try {
@@ -1992,12 +1997,57 @@ const getDefaultStashMessage = (branchName) => {
 
     {stashAction === "unstash" && (
       <>
-       <Autocomplete
+   <Autocomplete
   loading={isStashListLoading}
   options={unstashList}
-  getOptionLabel={option => (option && option.message ? option.message : '')}
+  // Show only the user's custom message (truncated)
+  getOptionLabel={option =>
+    option && option.message
+      ? (() => {
+          const cleanMsg = extractUserStashMessage(option.message, currentBranch);
+          return cleanMsg.length > 80 ? cleanMsg.slice(0, 80) + '...' : cleanMsg;
+        })()
+      : option?.ref || ''
+  }
   value={selectedUnstashMsg}
   onChange={(_, val) => setSelectedUnstashMsg(val)}
+  isOptionEqualToValue={(option, value) => option.ref === value?.ref}
+  // Show ref and clean message, with branch in faded style if you like
+  renderOption={(props, option) => {
+    const cleanMsg = extractUserStashMessage(option.message, currentBranch);
+    return (
+      <li
+        {...props}
+        key={option.ref}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          marginBottom: 2,
+          borderBottom: "1px solid #e5e7eb",
+          paddingBottom: 6,
+        }}
+      >
+        <span style={{ fontSize: "13px", color: "#64748b", marginBottom: 2 }}>
+          <code style={{ background: "#e0e7ef", borderRadius: 4, padding: "0 4px", marginRight: 6 }}>
+            {option.ref}
+          </code>
+        </span>
+        <span
+          style={{
+            fontSize: "15px",
+            color: "#171717",
+            wordBreak: "break-word",
+            lineHeight: 1.3,
+            maxWidth: 380,
+          }}
+          title={cleanMsg}
+        >
+          {cleanMsg.length > 90 ? cleanMsg.slice(0, 90) + '...' : cleanMsg}
+        </span>
+      </li>
+    );
+  }}
   renderInput={params => (
     <TextField
       {...params}
