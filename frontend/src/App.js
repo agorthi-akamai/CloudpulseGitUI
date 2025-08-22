@@ -118,13 +118,15 @@ const getCurrentBranchApi = async () => {
   return res.json();
 };
 
-const stashChangesApi = async () => {
+const stashChangesApi = async (stashMessage) => {
   const res = await fetch(`${API_URL}/stash`, {
-    method: "GET",
+    method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: stashMessage }),
   });
   return res.json();
 };
+
 
 const CloudPulseLogo = () => (
   <svg
@@ -660,34 +662,71 @@ const [selectedRemote, setSelectedRemote] = useState("");
   };
 
   // Stash handler
-  const handleStashChanges = async () => {
-    setIsStashing(true);
-    setSnackbar({ open: false, message: "", severity: "info" });
-    try {
-      const data = await stashChangesApi();
-      if (data.success) {
-        setSnackbar({
-          open: true,
-          message: data.message ?? "Stash successful.",
-          severity: "success",
-        });
-        if (data.branch) setCurrentBranch(data.branch);
-      } else {
-        setSnackbar({
-          open: true,
-          message: data.message ?? "Stash failed.",
-          severity: "error",
-        });
-      }
-    } catch (e) {
+  // state for stash message
+const [stashMessage, setStashMessage] = useState("");
+const [stashDialogOpen, setStashDialogOpen] = useState(false);
+const handleStashChanges = async () => {
+  setIsStashing(true);
+  setSnackbar({ open: false, message: "", severity: "info" });
+  try {
+    const data = await stashChangesApi(stashMessage); // stashMessage comes from dialog state
+    if (data.success) {
       setSnackbar({
         open: true,
-        message: String(e.message),
+        message: data.message ?? "Stash successful.",
+        severity: "success",
+      });
+      if (data.branch) setCurrentBranch(data.branch);
+    } else {
+      setSnackbar({
+        open: true,
+        message: data.message ?? "Stash failed.",
         severity: "error",
       });
     }
-    setIsStashing(false);
-  };
+  } catch (e) {
+    setSnackbar({
+      open: true,
+      message: String(e.message),
+      severity: "error",
+    });
+  }
+  setIsStashing(false);
+};
+
+
+const closeStashDialog = () => setStashDialogOpen(false);
+
+const openStashDialog = () => {
+  const suggestedMessage = getDefaultStashMessage(currentBranch || "branch");
+  setStashMessage(suggestedMessage);
+  setStashDialogOpen(true);
+};
+
+const handleConfirmStash = async () => {
+  await handleStashChanges(stashMessage);
+  setStashMessage(""); // clear after use
+  closeStashDialog();
+};
+const getDefaultStashMessage = (branchName) => {
+  const now = new Date();
+  const month = now.toLocaleString("en-US", { month: "short" }); // Aug
+  const hour = String(now.getHours()).padStart(2, "0");          // 11
+  const minute = String(now.getMinutes()).padStart(2, "0");      // 45
+  return `WIP: ${branchName}-${month}-${hour}-${minute}`;
+};
+
+// un stash
+const unstashChangesApi = async (stashMessage) => {
+  const res = await fetch(`${API_URL}/unstash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: stashMessage }),
+  });
+  return res.json();
+};
+
+
   // Pull with force option
   const handlePull = async () => {
     setIsPulling(true);
@@ -1900,14 +1939,42 @@ const [selectedRemote, setSelectedRemote] = useState("");
             </AppButton>
 
             <AppButton
-              startIcon={<SettingsBackupRestoreIcon />} // "restore" or "save" for stash
-              loading={isStashing}
-              onClick={handleStashChanges}
-              disabled={isStashing}
-              sx={{ minWidth: 128 }}
-            >
-              Stash
-            </AppButton>
+  startIcon={<SettingsBackupRestoreIcon />}
+  loading={isStashing}
+  onClick={openStashDialog}
+  disabled={isStashing}
+  sx={{ minWidth: 128 }}
+>
+  Stash
+</AppButton>
+
+<Dialog open={stashDialogOpen} onClose={closeStashDialog} maxWidth="sm" fullWidth>
+  <DialogTitle>Stash Changes</DialogTitle>
+  <DialogContent>
+    <TextField
+      autoFocus
+      margin="dense"
+      label="Stash Message"
+      type="text"
+      fullWidth
+      value={stashMessage}
+      onChange={(e) => setStashMessage(e.target.value)}
+      placeholder='e.g. "WIP: fixing login bug"'
+    />
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={closeStashDialog}>Cancel</Button>
+    <Button
+      onClick={handleConfirmStash}
+      variant="contained"
+      disabled={isStashing}
+    >
+      Confirm
+    </Button>
+  </DialogActions>
+</Dialog>
+
+
 
             <FloatingWhiteTooltip
               title={

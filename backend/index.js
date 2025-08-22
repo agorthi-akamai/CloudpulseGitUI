@@ -885,21 +885,82 @@ app.get('/get-remote-names', async (req, res) => {
   }
 });
 
-/** /stash - stash changes */
-app.get('/stash', async (req, res) => {
+app.post('/stash', async (req, res) => {
   try {
-    const { stdout } = await execGit('git stash', repoPath);
-    // After stash, get current branch
-    const { stdout: branchStdout } = await execGit('git rev-parse --abbrev-ref HEAD', repoPath);
+    // Take stashMessage from request body (or query if you prefer)
+    const stashMessage = req.body.stashMessage || req.query.stashMessage;
+
+    // Build the stash command
+    const stashCmd = stashMessage
+      ? `git stash save "${stashMessage}"`
+      : `git stash`;
+
+    // Run git stash
+    const { stdout } = await execGit(stashCmd, repoPath);
+
+    // Get current branch
+    const { stdout: branchStdout } = await execGit(
+      'git rev-parse --abbrev-ref HEAD',
+      repoPath
+    );
     const branchName = branchStdout.trim();
+
     // Refresh branches cache optionally
     refreshBranchesCache();
-    res.json({ success: true, message: stdout.trim() || 'Stash complete.', branch: branchName });
+
+    res.json({
+      success: true,
+      message: stdout.trim() || `Stash complete${stashMessage ? `: ${stashMessage}` : ''}`,
+      branch: branchName,
+    });
   } catch (err) {
     console.error('/stash error:', err.message || err);
     res.status(500).json({ success: false, error: err.message || 'Stash failed' });
   }
 });
+app.post('/unstash', async (req, res) => {
+  try {
+    const stashMessage = (req.body.message || "").trim();
+    if (!stashMessage) {
+      return res.status(400).json({ success: false, error: "Stash message is required" });
+    }
+
+    // list all stashes
+    const { stdout: listOut } = await execGit("git stash list", repoPath);
+    const lines = listOut.split("\n").filter(Boolean);
+
+    // find stash by message
+    const match = lines.find(line => line.includes(stashMessage));
+    if (!match) {
+      return res.status(404).json({ success: false, error: `No stash found with message: ${stashMessage}` });
+    }
+
+    // extract stash reference (e.g. stash@{2})
+    const stashRef = match.split(":")[0].trim();
+
+    // pop that stash
+    const { stdout } = await execGit(`git stash pop ${stashRef}`, repoPath);
+
+    const { stdout: branchStdout } = await execGit(
+      "git rev-parse --abbrev-ref HEAD",
+      repoPath
+    );
+    const branchName = branchStdout.trim();
+
+    refreshBranchesCache();
+
+    res.json({
+      success: true,
+      message: stdout.trim() || `Unstash complete: ${stashMessage}`,
+      branch: branchName,
+    });
+  } catch (err) {
+    console.error("/unstash error:", err.message || err);
+    res.status(500).json({ success: false, error: err.message || "Unstash failed" });
+  }
+});
+
+
 
 /** /current-branch */
 app.get('/current-branch', async (req, res) => {
