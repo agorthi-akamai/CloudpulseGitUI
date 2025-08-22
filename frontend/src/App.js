@@ -177,22 +177,16 @@ const [selectedRemote, setSelectedRemote] = useState("");
   const [runOutput, setRunOutput] = useState('');
   const [runError, setRunError] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-
-  const [outputOpen, setOutputOpen] = useState(false);
-  const [serverOutput, setServerOutput] = useState('');
-  const [serverError, setServerError] = useState('');
-  const [isServerRunning, setIsServerRunning] = useState(false);
-  const [serverOutputOpen, setServerOutputOpen] = useState(true);
-  
-
+const [outputOpen, setOutputOpen] = useState(false);
 const [stashAction, setStashAction] = useState("stash"); // "stash" or "unstash"
 const [unstashList, setUnstashList] = useState([]); // {ref, message}[]
 const [isStashListLoading, setIsStashListLoading] = useState(false);
 const [selectedUnstashMsg, setSelectedUnstashMsg] = useState("");
+const [isServerRunning, setIsServerRunning] = useState(false);
+const [serverOutput, setServerOutput] = useState('');
+const [serverError, setServerError] = useState('');
 
-  
-
-  // Instead of opening and closing in same event tick:
+// Instead of opening and closing in same event tick:
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
@@ -728,9 +722,6 @@ const loadUnstashList = async () => {
 };
 
 
-
-
-
 const handleConfirmStash = async () => {
   await handleStashChanges(stashMessage);
   setStashMessage(""); // clear after use
@@ -743,19 +734,7 @@ const getDefaultStashMessage = (branchName) => {
   const minute = String(now.getMinutes()).padStart(2, "0");      // 45
   return `WIP: ${branchName}-${month}-${hour}-${minute}`;
 };
-
-// un stash
-const unstashChangesApi = async (stashMessage) => {
-  const res = await fetch(`${API_URL}/unstash`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: stashMessage }),
-  });
-  return res.json();
-};
-
-
-  // Pull with force option
+ // Pull with force option
   const handlePull = async () => {
     setIsPulling(true);
     setSnackbar({ open: false, message: "", severity: "info" });
