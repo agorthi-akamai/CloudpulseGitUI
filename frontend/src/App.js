@@ -1194,7 +1194,7 @@ const getDefaultStashMessage = (branchName) => {
             style={{ width: 19, height: 19, color: "#0ea5e9" }}
             alt="Jira"
           />
-          <span style={{ fontWeight: 700, color: "#2563eb" }}>BugTicket</span>
+          <span style={{ fontWeight: 700, color: "black" }}>BugTicket</span>
         </Box>
       ),
       renderCell: (params) =>
@@ -2805,100 +2805,107 @@ const getDefaultStashMessage = (branchName) => {
         </Dialog>
         <Box>
           {/* Your search bar component here (as before) */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              bgcolor: "#fff",
-              border: "2.5px solid #bae6fd",
-              boxShadow: "0 4px 28px 0 #0284c71b",
-              borderRadius: 3,
-              px: 2,
-              py: 1.1,
-              maxWidth: 420,
-              width: "100%",
-              transition: "border 0.25s, box-shadow 0.25s",
-              "&:focus-within": {
-                borderColor: "#0ea5e9",
-                boxShadow: "0 8px 16px #0284c74a",
-              },
-            }}
-          >
-            <SearchIcon sx={{ color: "#0ea5e9", mr: 1.4, fontSize: 28 }} />
-            <Autocomplete
-              freeSolo
-              fullWidth
-              disablePortal
-              options={filteredSuggestions}
-              inputValue={search}
-              PaperComponent={(props) => (
-                <SuggestionPaper
-                  {...props}
-                  branchCount={filteredSuggestions.length}
-                />
-              )}
-              noOptionsText="No matching branches found"
-              onInputChange={(event, newInputValue, reason) => {
-                setSearch(newInputValue);
-                if (reason === "clear" || newInputValue === "") setQuery("");
-              }}
-              onChange={(event, newValue) => {
-                if (newValue !== null) {
-                  setQuery(newValue);
-                  setSearch(newValue);
-                }
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder="Type to see suggestions, Press Enter to search"
-                  variant="standard"
-                  InputProps={{
-                    ...params.InputProps,
-                    disableUnderline: true,
-                  }}
-                  sx={{
-                    bgcolor: "transparent",
-                    "& input": { fontSize: 18 },
-                  }}
-                />
-              )}
-              renderOption={(props, option, { selected }) => (
-                <Box
-                  component="li"
-                  {...props}
-                  sx={{
-                    px: 2,
-                    py: 1.1,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    color: "#0284c7",
-                    borderRadius: 2,
-                    cursor: "pointer",
-                    mb: 0.2,
-                    background: selected ? "#e0f2fe" : "#fff",
-                    "&:hover": {
-                      background: "#bae6fd",
-                      color: "#2563eb",
-                    },
-                    transition: "background 120ms",
-                  }}
-                >
-                  <span
-                    style={{
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      width: "100%",
-                      display: "block",
-                    }}
-                  >
-                    {option}
-                  </span>
-                </Box>
-              )}
-            />
-          </Box>
+       <Box
+  sx={{
+    display: "flex",
+    alignItems: "center",
+    bgcolor: "#fff",
+    border: "2.5px solid #bae6fd",
+    boxShadow: "0 4px 24px 0 #0284c71b",
+    borderRadius: 2.5,
+    px: 2.4,
+    py: 1.25,
+    maxWidth: 475,
+    width: "100%",
+    gap: 2,
+    transition: "border 0.25s, box-shadow 0.25s",
+    "&:focus-within": {
+      borderColor: "#0ea5e9",
+      boxShadow: "0 8px 18px #0ea5e930",
+    },
+  }}
+>
+  <SearchIcon sx={{ color: "#0ea5e9", mr: 1.6, fontSize: 27 }} />
+  <Autocomplete
+    freeSolo
+    fullWidth
+    disablePortal
+    options={filteredSuggestions}
+    inputValue={search}
+    PaperComponent={(props) => (
+      <SuggestionPaper {...props} branchCount={filteredSuggestions.length} />
+    )}
+    noOptionsText="No matching branches found"
+    onInputChange={(event, newInputValue, reason) => {
+      setSearch(newInputValue);
+      if (reason === "clear" || newInputValue === "") setQuery("");
+    }}
+    onChange={(event, newValue) => {
+      if (newValue !== null) {
+        setQuery(newValue);
+        setSearch(newValue);
+      }
+    }}
+    renderInput={(params) => (
+      <TextField
+        {...params}
+        placeholder="Type to see suggestions, Press Enter to search"
+        variant="standard"
+        InputProps={{
+          ...params.InputProps,
+          disableUnderline: true,
+        }}
+        sx={{
+          bgcolor: "transparent",
+          "& input": {
+            fontSize: 18,
+            fontWeight: 600,
+            color: "#0ea5e9",
+            pl: 0.5,
+            letterSpacing: 0.05,
+            border: "none",
+          },
+          width: "100%",
+        }}
+      />
+    )}
+    renderOption={(props, option, { selected }) => (
+      <Box
+        component="li"
+        {...props}
+        sx={{
+          px: 2,
+          py: 1,
+          fontSize: 16,
+          fontWeight: 600,
+          color: "#0284c7",
+          borderRadius: 2,
+          cursor: "pointer",
+          mb: 0.2,
+          background: selected ? "#e0f2fe" : "#fff",
+          "&:hover": {
+            background: "#bae6fd",
+            color: "#2563eb",
+          },
+          transition: "background 120ms",
+        }}
+      >
+        <span
+          style={{
+            whiteSpace: "nowrap",
+            textOverflow: "ellipsis",
+            overflow: "hidden",
+            width: "100%",
+            display: "block",
+          }}
+        >
+          {option}
+        </span>
+      </Box>
+    )}
+  />
+</Box>
+
           {/* Search bar ends here */}
 
           {/* Print count below the search bar */}
@@ -2920,47 +2927,61 @@ const getDefaultStashMessage = (branchName) => {
         </Box>
         {/* Current branch display */}
         <Box
-          sx={{
-            mb: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            position: "sticky",
-          }}
-        >
-          <Typography
-            variant="subtitle1"
-            sx={{ fontWeight: 700, color: "#2563eb" }}
-          >
-            Current Branch:
-          </Typography>
-          <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
-            <span>
-              <Chip
-                label={currentBranch || "Loading..."}
-                color="primary"
-                variant="outlined"
-                size="small"
-                clickable
-                onClick={handleShowBranchLog}
-                sx={{
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  bgcolor: "#e0f2fe",
-                  color: "#0284c7",
-                  "&:hover": {
-                    bgcolor: "#bae6fd",
-                    boxShadow: "0 0 0 2px #0ea5e9",
-                  },
-                  maxWidth: 280,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              />
-            </span>
-          </FloatingWhiteTooltip>
-        </Box>
+  sx={{
+    mb: 2,
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    position: "sticky",
+    background: "#0369a1",
+    borderRadius: 2,
+    px: 2,
+    py: 1,
+    boxShadow: 2,
+    maxWidth: 500
+  }}
+>
+  <Typography
+    variant="subtitle1"
+    sx={{
+      fontWeight: 700,
+      color: "white",
+      letterSpacing: 0.3,
+      mr: 1,
+      minWidth: 120,
+    }}
+  >
+    Current Branch:
+  </Typography>
+  <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
+    <span>
+      <Chip
+        label={currentBranch || "Loading..."}
+        variant="outlined"
+        size="small"
+        clickable
+        onClick={handleShowBranchLog}
+        sx={{
+          cursor: "pointer",
+          fontWeight: 700,
+          fontSize: 15,
+          bgcolor: "white",
+          color: "#0369a1",
+          borderColor: "#e0f2fe",
+          "&:hover": {
+            bgcolor: "#e0f2fe",
+            color: "#0284c7",
+            boxShadow: "0 0 0 2px #0ea5e9",
+          },
+          maxWidth: 280,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      />
+    </span>
+  </FloatingWhiteTooltip>
+</Box>
+
          {/* Branch Table */}
         <Box sx={{ mb: 1 }}></Box>
         <Paper

@@ -616,10 +616,14 @@ app.post('/create-branch', async (req, res) => {
       return res.status(400).json({ error: 'Missing remoteRepo, targetBranch, or branchName.' });
     }
     // validate simple names
-    if (!/^[\w\-]+$/.test(remoteRepo) || !/^[\w\-\/]+$/.test(targetBranch) || !/^[\w\-]+$/.test(branchName)) {
+    if (
+      !/^[\w.\-]+$/.test(remoteRepo) ||
+      !/^[\w.\-\/]+$/.test(targetBranch) ||
+      !/^[\w.\-]+$/.test(branchName)
+    ) {
       return res.status(400).json({ error: 'Invalid characters in input.' });
     }
-
+    
     // Building branch suffix with month/day (English)
     const now = new Date();
     const month = now.toLocaleString('en-US', { month: 'long' });
@@ -1035,6 +1039,7 @@ function getCompareCacheKey(base, compare, maxCommits, maxFiles) {
   return `${base}|${compare}|${maxCommits}|${maxFiles}`;
 }
 
+
 /** /compare-branches?base=branch1&compare=branch2 */
 app.get('/compare-branches', async (req, res) => {
   try {
@@ -1060,8 +1065,6 @@ app.get('/compare-branches', async (req, res) => {
 
     // ... [rest of your logic unchanged] ...
     // (Put your git logic here, then produce the result object to return)
-
-    // Your parsing, git logic
     const parseGraphLog = (stdout, branchName) =>
       stdout.trim().split('\n').filter(Boolean).map(line => {
         const match = line.match(/^([\|\*\\\/\s]*)([0-9a-f]{40})\|(.+?)\|(.+?)\|(.+)$/);
@@ -1102,6 +1105,15 @@ app.get('/compare-branches', async (req, res) => {
         };
       });
 
+    // FILTER unwanted extensions from stats BEFORE returning/caching to frontend
+    const unwantedExts = ['.md', '.json', '.yaml', '.yml', '.sh','.svg',"cloudpulse-pr-eslint-rules/index.js",
+      "cloudpulse-pr-eslint-rules/no-non-null-assertion.js","cloudpulse-pr-eslint-rules/no-useless-template.js"];
+    const filteredStats = stats.filter(stat => {
+      if (!stat.file) return false;
+      const lower = stat.file.toLowerCase();
+      return !unwantedExts.some(ext => lower.endsWith(ext));
+    });
+
     const result = {
       success: true,
       base,
@@ -1112,8 +1124,8 @@ app.get('/compare-branches', async (req, res) => {
         onlyInBaseTruncated: commitsBase.length === maxCommits,
         onlyInCompareTruncated: commitsCompare.length === maxCommits,
       },
-      stats,
-      statsTruncated: stats.length === maxFiles
+      stats: filteredStats,
+      statsTruncated: filteredStats.length === maxFiles
     };
 
     // Store in cache
@@ -1125,6 +1137,7 @@ app.get('/compare-branches', async (req, res) => {
     res.status(500).json({ success: false, error: err.message || 'Failed to compare branches' });
   }
 });
+
 
 // Fallback root
 app.get('/', (req, res) => res.json({ success: true, message: 'Cloudpulse Git UI Backend running' }));
