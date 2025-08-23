@@ -29,6 +29,7 @@ import {
   Avatar,
   Collapse
 } from "@mui/material";
+import LinearProgress from '@mui/material/LinearProgress';
 import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
@@ -1407,7 +1408,8 @@ const getDefaultStashMessage = (branchName) => {
             >
               <MenuItem
                 onClick={() => {
-                  handleCheckout(params.row.name);
+                  setCheckoutBranchName(params.row.name);    // <-- ADD THIS LINE
+                  setCheckoutDialogOpen(true);               // <-- AND THIS LINE
                   handleCloseMenu();
                 }}
                 disabled={currentBranch === params.row.name}
@@ -2694,59 +2696,73 @@ const getDefaultStashMessage = (branchName) => {
         </Dialog>
         {/* Checkout Branch Dialog */}
         <Dialog
-          open={checkoutDialogOpen}
-          onClose={() => setCheckoutDialogOpen(false)}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitle>
-            Checkout Branch
-            <IconButton
-              sx={{ ml: "auto" }}
-              onClick={() => setCheckoutDialogOpen(false)}
-              aria-label="close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
-            <TextField
-              label="Branch Name"
-              fullWidth
-              margin="dense"
-              value={checkoutBranchName}
-              onChange={(e) => setCheckoutBranchName(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              helperText="Enter the branch name to checkout"
-              disabled={isCheckingOut}
-              autoFocus
-            />
-          </DialogContent>
+  open={checkoutDialogOpen}
+  onClose={(event, reason) => {
+    if (isCheckingOut && (reason === "backdropClick" || reason === "escapeKeyDown")) {
+      return; // prevent closing while loading
+    }
+    setCheckoutDialogOpen(false);
+  }}
+  maxWidth="xs"
+  fullWidth
+>
+  {/* LinearProgress at the very top */}
+  {isCheckingOut && <LinearProgress  color="primary"/>}
 
-          <DialogActions>
-            <Button
-              onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
-              disabled={isCheckingOut}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={!checkoutBranchName.trim() || isCheckingOut}
-              onClick={handleCheckoutBranch}
-              startIcon={
-                isCheckingOut ? (
-                  <CircularProgress color="inherit" size={18} />
-                ) : null
-              }
-              sx={{ minWidth: 120 }} // prevent layout jump when spinner appears
-            >
-              {isCheckingOut ? "Checking out..." : "Checkout"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+  <DialogTitle>
+    Checkout Branch
+    <IconButton
+      sx={{ ml: "auto" }}
+      onClick={() => {
+        if (!isCheckingOut) setCheckoutDialogOpen(false);
+      }}
+      aria-label="close"
+      disabled={isCheckingOut}
+    >
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+
+  <DialogContent dividers>
+  <TextField
+  label="Branch Name"
+  fullWidth
+  margin="dense"
+  value={checkoutBranchName}
+  disabled={true}                 // <-- DISABLE TEXT FIELD
+  inputProps={{ readOnly: true }} // <-- PREVENT TYPING, shows as readonly
+  autoComplete="off"
+  spellCheck={false}
+  helperText="Selected branch to checkout"
+  autoFocus
+/>
+  </DialogContent>
+
+  <DialogActions>
+    <Button
+      onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
+      disabled={isCheckingOut}
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="contained"
+      color="primary"
+      disabled={!checkoutBranchName.trim() || isCheckingOut}
+      onClick={handleCheckoutBranch}
+      startIcon={
+        isCheckingOut ? (
+          <CircularProgress color="inherit" size={18} />
+        ) : null
+      }
+      sx={{ minWidth: 120 }}
+    >
+      {isCheckingOut ? "Checking out..." : "Checkout"}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+        {/* Environment Switcher Dialog */}
         <Dialog
           open={envSwitcherOpen}
           onClose={handleCloseEnvSwitcher}
