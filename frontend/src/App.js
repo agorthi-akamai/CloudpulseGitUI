@@ -2924,62 +2924,48 @@ const getDefaultStashMessage = (branchName) => {
             {branches.length} {branches.length === 1 ? "branch" : "branches"}{" "}
             shown
           </Typography>
+          <Box
+          sx={{
+            mb: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            position: "sticky",
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 700, color: "#2563eb" }}
+          >
+            Current Branch:
+          </Typography>
+          <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
+            <span>
+              <Chip
+                label={currentBranch || "Loading..."}
+                color="primary"
+                variant="outlined"
+                size="small"
+                clickable
+                onClick={handleShowBranchLog}
+                sx={{
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  bgcolor: "#e0f2fe",
+                  color: "#0284c7",
+                  "&:hover": {
+                    bgcolor: "#bae6fd",
+                    boxShadow: "0 0 0 2px #0ea5e9",
+                  },
+                  maxWidth: 280,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              />
+            </span>
+          </FloatingWhiteTooltip>
         </Box>
-        {/* Current branch display */}
-        <Box
-  sx={{
-    mb: 2,
-    display: "flex",
-    alignItems: "center",
-    gap: 2,
-    position: "sticky",
-    background: "#0369a1",
-    borderRadius: 2,
-    px: 2,
-    py: 1,
-    boxShadow: 2,
-    maxWidth: 500
-  }}
->
-  <Typography
-    variant="subtitle1"
-    sx={{
-      fontWeight: 700,
-      color: "white",
-      letterSpacing: 0.3,
-      mr: 1,
-      minWidth: 120,
-    }}
-  >
-    Current Branch:
-  </Typography>
-  <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
-    <span>
-      <Chip
-        label={currentBranch || "Loading..."}
-        variant="outlined"
-        size="small"
-        clickable
-        onClick={handleShowBranchLog}
-        sx={{
-          cursor: "pointer",
-          fontWeight: 700,
-          fontSize: 15,
-          bgcolor: "white",
-          color: "#0369a1",
-          borderColor: "#e0f2fe",
-          "&:hover": {
-            bgcolor: "#e0f2fe",
-            color: "#0284c7",
-            boxShadow: "0 0 0 2px #0ea5e9",
-          },
-          maxWidth: 280,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      />
-    </span>
-  </FloatingWhiteTooltip>
 </Box>
 
          {/* Branch Table */}
