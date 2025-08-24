@@ -417,22 +417,23 @@ const [serverError, setServerError] = useState('');
     return await response.json();
   };
 
-  const SuggestionPaper = React.forwardRef(function SuggestionPaper(props, ref) {
-    return (
-      <Paper
-        ref={ref}
-        {...props}
-        elevation={10}
-        sx={{
-          bgcolor: "#171928", // dark, matches dashboard
-          borderRadius: 2,
-          color: "#e0e7ef",
-          boxShadow: "0 8px 40px #38bdf840",
-          border: "1.5px solid #232642"
-        }}
-      />
-    );
-  });
+ const SuggestionPaper = (props) => (
+  <Paper
+    {...props}
+    sx={{
+      backgroundColor: "#171928",
+      color: "#e5e7eb",
+      width: "100%",
+      mt: 1,
+      maxHeight: 300,
+      overflowY: "auto",
+      borderRadius: 2,
+      boxShadow: "0 8px 40px #00000030",
+      ...props.sx,
+    }}
+  />
+);
+
 
   // Compute filtered suggestions based on current input
   const filteredSuggestions = suggestions.filter((opt) =>
@@ -622,37 +623,44 @@ const [serverError, setServerError] = useState('');
   // Confirm single branch delete
   const handleConfirmDelete = async () => {
     const branchName = confirmDelete.branchName;
-    setDeletingBranches((prev) => new Set(prev).add(branchName)); // disables button during work
+    setDeletingBranches(prev => new Set(prev).add(branchName));
+  
     try {
       const result = await deleteBranchApi(branchName);
-      if (result.success) {
+  
+      if (result && result.success) {
         setSnackbar({
           open: true,
           message: `Branch "${branchName}" deleted.`,
           severity: "success",
         });
-        setBranches((prev) => prev.filter((b) => b.name !== branchName));
+        setBranches(prev => prev.filter(b => b.name !== branchName));
         setConfirmDelete({ open: false, branchName: "" });
       } else {
         setSnackbar({
           open: true,
-          message: result.error || "Delete failed.",
+          message: (result && result.error) || "Delete failed.",
           severity: "error",
         });
+        setConfirmDelete({ open: false, branchName: "" }); // CLOSE DIALOG ON ERROR TOO
       }
     } catch (e) {
       setSnackbar({
         open: true,
-        message: String(e.message),
+        message: e?.message || "Delete failed.",
         severity: "error",
       });
+      setConfirmDelete({ open: false, branchName: "" }); // CLOSE DIALOG ON ERROR TOO
+    } finally {
+      setDeletingBranches(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(branchName);
+        return newSet;
+      });
     }
-    setDeletingBranches((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(branchName);
-      return newSet;
-    });
   };
+  
+  
 
   // Stash handler
   // state for stash message
@@ -965,40 +973,40 @@ const getDefaultStashMessage = (branchName) => {
   // Checkout branch handler
   const handleCheckoutBranch = async () => {
     if (!checkoutBranchName.trim()) return;
-
+  
     setIsCheckingOut(true);
-
+  
     try {
       const resp = await fetch(`${API_URL}/checkout-branch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ branch: checkoutBranchName.trim() }),
       });
-
+  
       const data = await resp.json();
-
+  
       if (!resp.ok || !data.success) {
         throw new Error(data.error || "Checkout failed");
       }
-
-      // Success Snackbar & Refresh current branch info
+  
       setSnackbar({ open: true, message: data.message, severity: "success" });
-
+  
       const current = await getCurrentBranchApi();
       if (current.branch) setCurrentBranch(current.branch);
-
-      // Don't close dialog here, delay closing after spinner off
+  
+      // The dialog will close after spinner stops, see finally block
     } catch (error) {
       setSnackbar({ open: true, message: String(error), severity: "error" });
     } finally {
-      setIsCheckingOut(false); // Stop spinner first
-
-      // Delay dialog close slightly to allow spinner render
-      setTimeout(() => {
-        setCheckoutDialogOpen(false);
-      }, 400);
+      setIsCheckingOut(false);
+      // Small delay to let spinner/circular progress appear for a smooth feel
+        setTimeout(() => {
+        setIsCheckingOut(false);  // Stop spinner, enable dialog actions/buttons
+        setCheckoutDialogOpen(false); // Close dialog
+      }, 100); // 200-400ms is enough for UX polish, not too long
     }
   };
+  
   const BUTTON_BG = {
     primary: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)", // blue
     green: "linear-gradient(90deg, #22c55e 60%, #4ade80 100%)",    // green
@@ -1066,22 +1074,28 @@ const getDefaultStashMessage = (branchName) => {
 
   const handleDeleteRemote = async () => {
     if (!selectedRemote) return;
+  
     try {
       const response = await fetch(
         `${API_URL}/remove-remote/${selectedRemote}`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" }
       );
+  
+      // Attempt to parse response (might fail if not JSON)
+      let errorData = {};
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to remove remote");
+        try {
+          errorData = await response.json();
+        } catch {
+          // If parsing fails (server sends no JSON), errorData remains {}
+        }
+        throw new Error(errorData.error || `Failed to remove remote (code ${response.status})`);
       }
+  
       setRemotes(remotes.filter((r) => r !== selectedRemote));
       setSelectedRemote("");
       setRemoveRemoteDialogOpen(false);
-
-      // Use consolidated snackbar state update
+  
       setSnackbar({
         open: true,
         message: `Remote '${selectedRemote}' removed successfully.`,
@@ -1090,11 +1104,13 @@ const getDefaultStashMessage = (branchName) => {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: `Failed to remove remote: ${error.message}`,
+        message: `Failed to remove remote: ${error.message || "Unknown error"}`,
         severity: "error",
       });
     }
   };
+
+  
   function extractUserStashMessage(stashMessage, branchName) {
     const prefix = `On ${branchName}: `;
     return stashMessage.startsWith(prefix) ? stashMessage.slice(prefix.length) : stashMessage;
@@ -1386,6 +1402,7 @@ const getDefaultStashMessage = (branchName) => {
             alignItems: "center",
             justifyContent: "center",
             width: "100%",
+            
           }}
         >
           <IconButton
@@ -1396,458 +1413,576 @@ const getDefaultStashMessage = (branchName) => {
             <MoreVertIcon sx={{ color: "#fff" }} />
           </IconButton>
           {menuBranch === params.row.name && (
-            <Menu
-              anchorEl={menuAnchorEl}
-              open={Boolean(menuAnchorEl)}
-              onClose={handleMenuClose}
-            >
-              <MenuItem
-                onClick={() => {
-                  setCheckoutBranchName(params.row.name);    // <-- ADD THIS LINE
-                  setCheckoutDialogOpen(true);               // <-- AND THIS LINE
-                  handleCloseMenu();
-                }}
-                disabled={currentBranch === params.row.name}
-                sx={{ minWidth: 120 }}
-              >
-                <CheckIcon fontSize="small" sx={{ mr: 1 }} />
-                Checkout
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleDelete(params.row.name);
-                  handleCloseMenu();
-                }}
-                sx={{ color: "error.main", minWidth: 120 }}
-              >
-                <DeleteIcon
-                  sx={{ color: "error.main", mr: 1 }}
-                  fontSize="small"
-                />
-                Delete
-              </MenuItem>
 
-              <MenuItem
-                onClick={() => {
-                  handleMenuClose(); // Close the menu first
-                  setPendingCompareBranch(params.row.name); // Save pending branch
-                }}
-                sx={{
-                  color: "#0284c7",
-                  minWidth: 120,
-                  fontWeight: 700,
-                  "&:hover": {
-                    bgcolor: "#e0f2fe",
-                    color: "#0ea5e9",
-                  },
-                  textTransform: "none",
-                }}
-              >
-                <CompareArrowsIcon
-                  fontSize="small"
-                  sx={{ color: "#0ea5e9", mr: 1, verticalAlign: "middle" }}
-                />
-                Compare With...
-              </MenuItem>
+<Menu
+anchorEl={menuAnchorEl}
+open={Boolean(menuAnchorEl)}
+onClose={handleMenuClose}
+PaperProps={{
+  sx: {
+    bgcolor: "#fff",
+    color: "#111",
+    boxShadow: 3,
+    borderRadius: 2,
+    minWidth: 160,
+    p: 0,
+  }
+}}
+>
+{/* --- Checkout --- */}
+{params.row.name === currentBranch ? (
+  <MenuItem
+    sx={{
+      color: "#a1a1aa",             // gray for disabled
+      fontWeight: 700,
+      cursor: "not-allowed",
+      opacity: 0.7,
+      minWidth: 120,
+      display: "flex",
+      alignItems: "center",
+      "&:hover": { bgcolor: "#fff" },
+    }}
+    tabIndex={-1}
+    disableRipple
+    onClick={e => e.stopPropagation()}
+  >
+    Checkout
+  </MenuItem>
+) : (
+  <MenuItem
+    onClick={() => {
+      setCheckoutBranchName(params.row.name);
+      setCheckoutDialogOpen(true);
+      handleCloseMenu();
+    }}
+    sx={{
+      color: "#111",                 // black for active
+      fontWeight: 700,
+      minWidth: 120,
+      display: "flex",
+      alignItems: "center"
+    }}
+  >
+    <CheckIcon fontSize="small" sx={{ mr: 1, color: "#111" }} />
+    Checkout
+  </MenuItem>
+)}
+
+{/* --- Delete --- */}
+<MenuItem
+  onClick={() => {
+    handleDelete(params.row.name);
+    handleCloseMenu();
+  }}
+  sx={{
+    color: "#dc2626",
+    fontWeight: 700,
+    minWidth: 120,
+    display: "flex",
+    alignItems: "center"
+  }}
+>
+  <DeleteIcon sx={{ color: "#dc2626", mr: 1 }} fontSize="small" />
+  Delete
+</MenuItem>
+
+{/* --- Compare With... --- */}
+<MenuItem
+  onClick={() => {
+    handleMenuClose();
+    setPendingCompareBranch(params.row.name);
+  }}
+  sx={{
+    color: "#64748b",              // neutral gray (not blue)
+    fontWeight: 700,
+    minWidth: 120,
+    display: "flex",
+    alignItems: "center",
+    "&:hover": {
+      bgcolor: "#e0f2fe",
+      color: "#0ea5e9",
+    },
+    textTransform: "none",
+  }}
+>
+  <CompareArrowsIcon
+    fontSize="small"
+    sx={{ color: "#64748b", mr: 1, verticalAlign: "middle" }}
+  />
+  Compare With...
+</MenuItem>
 
               <Dialog
-                open={compareDialogOpen}
-                onClose={() => setCompareDialogOpen(false)}
-                maxWidth="sm"
-                fullWidth
-                
-              >
-                <DialogTitle>Compare Branches</DialogTitle>
-                <DialogContent>
-                  <Box sx={{ mt: 1, mb: 2 }}>
-                    <Typography component="span" sx={{ fontWeight: 700 }}>
-                      Base:
-                    </Typography>
-                    {baseBranch ? (
-                      <Chip
-                        label={baseBranch}
-                        sx={{
-                          ml: 1,
-                          display: "inline-flex",
-                          verticalAlign: "middle",
-                        }}
-                      />
-                    ) : (
-                      <Typography component="span" sx={{ ml: 1 }}>
-                        -
-                      </Typography>
-                    )}
-                  </Box>
-
-                  <Autocomplete
-                    options={branches
-                      .map((b) => b.name)
-                      .filter((name) => name !== baseBranch)}
-                    value={compareBranch}
-                    onChange={(_, val) => setCompareBranch(val || "")}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Select branch to compare with"
-                      />
-                    )}
-                    fullWidth
-                    disableClearable
-                    sx={{ mb: 2 }}
-                  />
-
-                  {compareLoading && (
-                    <Box textAlign="center" py={2}>
-                      <CircularProgress />
-                    </Box>
-                  )}
-
-                  {/* Show/Hide Changed Files Table */}
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={showChangeset}
-                        onChange={(e) => setShowChangeset(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label="Show changed files (Files Changed Table)"
-                    sx={{ mt: 1 }}
-                  />
-
-                  {compareResult && (
-                    <Paper
-                      variant="outlined"
-                      sx={{ mt: 2, p: 2, bgcolor: "background.paper" }}
+  open={compareDialogOpen}
+  onClose={() => setCompareDialogOpen(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff",   // White background for entire dialog
+      color: "#111",     // Black text
+      borderRadius: 4,
+    }
+  }}
+>
+  <DialogTitle sx={{ color: "#0284c7", fontWeight: 700 }}>
+    Compare Branches
+  </DialogTitle>
+  <DialogContent>
+    <Box sx={{ mt: 1, mb: 2 }}>
+      <Typography component="span" sx={{ fontWeight: 700 }}>
+        Base:
+      </Typography>
+      {baseBranch ? (
+        <Chip
+          label={baseBranch}
+          sx={{
+            ml: 1,
+            display: "inline-flex",
+            verticalAlign: "middle",
+            color: "#111",  // black text for base chip
+            background: "#f1f5f9"
+          }}
+        />
+      ) : (
+        <Typography component="span" sx={{ ml: 1 }}>
+          -
+        </Typography>
+      )}
+    </Box>
+    {/* --- AUTOCOMPLETE START --- */}
+    <Autocomplete
+      options={branches
+        .map((b) => b.name)
+        .filter((name) => name !== baseBranch)}
+      value={compareBranch}
+      onChange={(_, val) => setCompareBranch(val || "")}
+      fullWidth
+      disableClearable
+      sx={{
+        mb: 2,
+        "& .MuiAutocomplete-input": { color: "#111" }, // black selected value
+        "& .MuiOutlinedInput-root": { background: "#fff", color: "#111" },
+        "& .MuiInputLabel-root": { color: "#111" },
+      }}
+      PaperComponent={({ children }) => (
+        <Paper
+          sx={{
+            bgcolor: "#fff",
+            color: "#111",
+            borderRadius: 2,
+            boxShadow: 3,
+          }}
+        >
+          {children}
+        </Paper>
+      )}
+      renderOption={(props, option, { index }) => (
+        <React.Fragment key={option}>
+          <li
+            {...props}
+            style={{
+              color: "#111",
+              fontWeight: 500,
+              background: "#fff",
+              padding: "8px 16px",
+            }}
+          >
+            {option}
+          </li>
+          {/* Add divider after every option except last */}
+          {index <
+            branches
+              .map((b) => b.name)
+              .filter((name) => name !== baseBranch).length - 1 && (
+            <Divider sx={{ my: 0 }} />
+          )}
+        </React.Fragment>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Select branch to compare with"
+          sx={{
+            input: { color: "#111" }, // black text
+            label: { color: "#111" }, // black label
+            bgcolor: "#fff",
+          }}
+        />
+      )}
+    />
+    {/* --- AUTOCOMPLETE END --- */}
+    {compareLoading && (
+      <Box textAlign="center" py={2}>
+        <CircularProgress />
+      </Box>
+    )}
+    <FormControlLabel
+      control={
+        <Checkbox
+          checked={showChangeset}
+          onChange={(e) => setShowChangeset(e.target.checked)}
+          color="primary"
+        />
+      }
+      label="Show changed files (Files Changed Table)"
+      sx={{ mt: 1, color: "#111" }}
+    />
+    {compareResult && (
+      <Paper
+        variant="outlined"
+        sx={{ mt: 2, p: 2, bgcolor: "#fff" }}
+      >
+        <Typography
+          variant="h6"
+          sx={{ mb: 2, color: "#0284c7", fontWeight: 900 }}
+        >
+          <CompareArrowsIcon
+            sx={{ mr: 1, verticalAlign: "middle" }}
+          />{" "}
+          Comparison Result
+        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            mb: 2,
+            gap: 2,
+          }}
+        >
+          <Chip
+            label={`Base: ${baseBranch}`}
+            color="primary"
+            sx={{
+              fontWeight: 700,
+              bgcolor: "#0ea5e9",
+              color: "#fff",
+            }}
+          />
+          <Chip
+            label={`Compared: ${compareBranch}`}
+            color="success"
+            sx={{
+              fontWeight: 700,
+              bgcolor: "#22c55e",
+              color: "#fff",
+            }}
+          />
+          <Chip
+            label={`Files Changed: ${compareResult.stats?.length ?? 0}`}
+            color="secondary"
+          />
+        </Box>
+        <Divider sx={{ mb: 2 }} />
+        {/* Commits only in base */}
+        <Box sx={{ mb: 3 }}>
+          <Alert
+            icon={false}
+            severity="info"
+            sx={{
+              fontWeight: 900,
+              color: "#0ea5e9",
+              mb: 1,
+              bgcolor: "#e0f2fe",
+            }}
+          >
+            Commits only in <b>{baseBranch}</b> ({compareResult.commits?.onlyInBase?.length ?? 0})
+          </Alert>
+          {compareResult?.commits?.onlyInBase?.length > 0 ? (
+            <Box>
+              {compareResult.commits.onlyInBase.map((c, i) => (
+                <Paper
+                  key={c.hash || i}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    p: 1.1,
+                    borderRadius: 2,
+                    mb: 1,
+                    bgcolor: i % 2 === 0 ? "#f3fafd" : "#e9f7fe",
+                    borderLeft: "4px solid #0ea5e9",
+                  }}
+                  elevation={0}
+                >
+                  <Avatar
+                    sx={{
+                      bgcolor: stringToColor(c.author),
+                      width: 32,
+                      height: 32,
+                      mr: 1,
+                    }}
+                  >
+                    {c.author?.[0]?.toUpperCase() ?? "?"}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontWeight: 700,
+                        wordBreak: "break-word",
+                        color: "#111"
+                      }}
                     >
-                      <Typography
-                        variant="h6"
-                        sx={{ mb: 2, color: "#0284c7", fontWeight: 900 }}
-                      >
-                        <CompareArrowsIcon
-                          sx={{ mr: 1, verticalAlign: "middle" }}
-                        />{" "}
-                        Comparison Result
-                      </Typography>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                          mb: 2,
-                          gap: 2,
-                        }}
-                      >
-                        <Chip
-                          label={`Base: ${baseBranch}`}
-                          color="primary"
-                          sx={{
-                            fontWeight: 700,
-                            bgcolor: "#0ea5e9",
-                            color: "#fff",
-                          }}
-                        />
-                        <Chip
-                          label={`Compared: ${compareBranch}`}
-                          color="success"
-                          sx={{
-                            fontWeight: 700,
-                            bgcolor: "#22c55e",
-                            color: "#fff",
-                          }}
-                        />
-                        <Chip
-                          label={`Files Changed: ${compareResult.stats?.length ?? 0}`}
-                          color="secondary"
-                        />
-                      </Box>
-                      <Divider sx={{ mb: 2 }} />
-
-                      {/* Commits only in base */}
-                      <Box sx={{ mb: 3 }}>
-                        <Alert
-                          icon={false}
-                          severity="info"
-                          sx={{
-                            fontWeight: 900,
-                            color: "#0ea5e9",
-                            mb: 1,
-                            bgcolor: "#e0f2fe",
-                          }}
-                        >
-                          Commits only in <b>{baseBranch}</b> (
-                          {compareResult.commits?.onlyInBase?.length ?? 0})
-                        </Alert>
-                        {compareResult?.commits?.onlyInBase?.length > 0 ? (
-                          <Box>
-                            {compareResult.commits.onlyInBase.map((c, i) => (
-                              <Paper
-                                key={c.hash || i}
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  p: 1.1,
-                                  borderRadius: 2,
-                                  mb: 1,
-                                  bgcolor: i % 2 === 0 ? "#f3fafd" : "#e9f7fe",
-                                  borderLeft: "4px solid #0ea5e9",
-                                }}
-                                elevation={0}
-                              >
-                                <Avatar
-                                  sx={{
-                                    bgcolor: stringToColor(c.author),
-                                    width: 32,
-                                    height: 32,
-                                    mr: 1,
-                                  }}
-                                >
-                                  {c.author?.[0]?.toUpperCase() ?? "?"}
-                                </Avatar>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{
-                                      fontWeight: 700,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {c.message}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ color: "#555", fontWeight: 500 }}
-                                  >
-                                    <span style={{ color: "#0181c2" }}>
-                                      {c.author}
-                                    </span>
-                                    {c.hash && (
-                                      <Tooltip title={c.hash}>
-                                        <Button
-                                          size="small"
-                                          sx={{
-                                            ml: 1,
-                                            color: "#94a3b8",
-                                            fontFamily: "monospace",
-                                            minWidth: 0,
-                                          }}
-                                          onClick={() =>
-                                            navigator.clipboard.writeText(
-                                              c.hash,
-                                            )
-                                          }
-                                        >
-                                          #{c.hash.slice(0, 7)}
-                                          <ContentCopyIcon
-                                            sx={{ fontSize: 18, ml: 0.5 }}
-                                          />
-                                        </Button>
-                                      </Tooltip>
-                                    )}
-                                  </Typography>
-                                </Box>
-                              </Paper>
-                            ))}
-                          </Box>
-                        ) : (
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "#64748b", pl: 1.5 }}
+                      {c.message}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "#555", fontWeight: 500 }}
+                    >
+                      <span style={{ color: "#0181c2" }}>
+                        {c.author}
+                      </span>
+                      {c.hash && (
+                        <Tooltip title={c.hash}>
+                          <Button
+                            size="small"
+                            sx={{
+                              ml: 1,
+                              color: "#94a3b8",
+                              fontFamily: "monospace",
+                              minWidth: 0,
+                            }}
+                            onClick={() =>
+                              navigator.clipboard.writeText(
+                                c.hash,
+                              )
+                            }
                           >
-                            None
-                          </Typography>
-                        )}
-                      </Box>
-
-                      {/* Commits only in compare */}
-                      <Box sx={{ mb: 3 }}>
-                        <Alert
-                          icon={false}
-                          severity="success"
-                          sx={{
-                            fontWeight: 900,
-                            color: "#22c55e",
-                            mb: 1,
-                            bgcolor: "#d3fbe9",
-                          }}
-                        >
-                          Commits only in <b>{compareBranch}</b> (
-                          {compareResult.commits?.onlyInCompare?.length ?? 0})
-                        </Alert>
-                        {compareResult?.commits?.onlyInCompare?.length > 0 ? (
-                          <Box>
-                            {compareResult.commits.onlyInCompare.map((c, i) => (
-                              <Paper
-                                key={c.hash || i}
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  p: 1.1,
-                                  borderRadius: 2,
-                                  mb: 1,
-                                  bgcolor: i % 2 === 0 ? "#f6fcf6" : "#e9fdeb",
-                                  borderLeft: "4px solid #22c55e",
-                                }}
-                                elevation={0}
-                              >
-                                <Avatar
-                                  sx={{
-                                    bgcolor: stringToColor(c.author),
-                                    width: 32,
-                                    height: 32,
-                                    mr: 1,
-                                  }}
-                                >
-                                  {c.author?.[0]?.toUpperCase() ?? "?"}
-                                </Avatar>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{
-                                      fontWeight: 700,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {c.message}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ color: "#555", fontWeight: 500 }}
-                                  >
-                                    <span style={{ color: "#0e8c3f" }}>
-                                      {c.author}
-                                    </span>
-                                    {c.hash && (
-                                      <Tooltip title={c.hash}>
-                                        <Button
-                                          size="small"
-                                          sx={{
-                                            ml: 1,
-                                            color: "#166534",
-                                            fontFamily: "monospace",
-                                            minWidth: 0,
-                                          }}
-                                          onClick={() =>
-                                            navigator.clipboard.writeText(
-                                              c.hash,
-                                            )
-                                          }
-                                        >
-                                          #{c.hash.slice(0, 7)}
-                                          <ContentCopyIcon
-                                            sx={{ fontSize: 18, ml: 0.5 }}
-                                          />
-                                        </Button>
-                                      </Tooltip>
-                                    )}
-                                  </Typography>
-                                </Box>
-                              </Paper>
-                            ))}
-                          </Box>
-                        ) : (
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "#64748b", pl: 1.5 }}
-                          >
-                            None
-                          </Typography>
-                        )}
-                      </Box>
-
-                      {/* Files Changed Table (conditional on showChangeset) */}
-                      {showChangeset && (
-                        <>
-                          {compareResult.stats?.length > 0 ? (
-                            <Paper
-                              variant="outlined"
-                              sx={{ mb: 1, p: 1, bgcolor: "#f4f6fb" }}
-                            >
-                              <Typography
-                                variant="subtitle2"
-                                sx={{ fontWeight: 700, mb: 1 }}
-                              >
-                                Files Changed ({compareResult.stats.length})
-                              </Typography>
-                              <Box
-                                component="table"
-                                sx={{ width: "100%", fontSize: 15 }}
-                              >
-                                <thead>
-                                  <tr style={{ color: "#64748b" }}>
-                                    <th align="left">File</th>
-                                    <th align="right">+ Added</th>
-                                    <th align="right">– Deleted</th>
-                                    <th align="right">Net</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {compareResult.stats.map((row, idx) => (
-                                    <tr key={row.file}>
-                                      <td style={{ wordBreak: "break-all" }}>
-                                        {row.file}
-                                      </td>
-                                      <td
-                                        align="right"
-                                        style={{ color: "#16a34a" }}
-                                      >
-                                        +{row.added}
-                                      </td>
-                                      <td
-                                        align="right"
-                                        style={{ color: "#dc2626" }}
-                                      >
-                                        -{row.deleted}
-                                      </td>
-                                      <td
-                                        align="right"
-                                        style={{
-                                          fontWeight: 700,
-                                          color:
-                                            row.net > 0
-                                              ? "#166534"
-                                              : row.net < 0
-                                                ? "#dc2626"
-                                                : "#64748b",
-                                        }}
-                                      >
-                                        {row.net}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </Box>
-                            </Paper>
-                          ) : (
-                            <Typography
-                              variant="body2"
-                              sx={{ color: "#64748b", pl: 1.5 }}
-                            >
-                              No files changed.
-                            </Typography>
-                          )}
-                        </>
+                            #{c.hash.slice(0, 7)}
+                            <ContentCopyIcon
+                              sx={{ fontSize: 18, ml: 0.5 }}
+                            />
+                          </Button>
+                        </Tooltip>
                       )}
-                    </Paper>
-                  )}
-                </DialogContent>
-                <DialogActions>
-                  <Button
-                    onClick={() => setCompareDialogOpen(false)}
-                    color="secondary"
+                    </Typography>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          ) : (
+            <Typography
+              variant="body2"
+              sx={{ color: "#64748b", pl: 1.5 }}
+            >
+              None
+            </Typography>
+          )}
+        </Box>
+        {/* Commits only in compare */}
+        <Box sx={{ mb: 3 }}>
+          <Alert
+            icon={false}
+            severity="success"
+            sx={{
+              fontWeight: 900,
+              color: "#22c55e",
+              mb: 1,
+              bgcolor: "#d3fbe9",
+            }}
+          >
+            Commits only in <b>{compareBranch}</b> ({compareResult.commits?.onlyInCompare?.length ?? 0})
+          </Alert>
+          {compareResult?.commits?.onlyInCompare?.length > 0 ? (
+            <Box>
+              {compareResult.commits.onlyInCompare.map((c, i) => (
+                <Paper
+                  key={c.hash || i}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    p: 1.1,
+                    borderRadius: 2,
+                    mb: 1,
+                    bgcolor: i % 2 === 0 ? "#f6fcf6" : "#e9fdeb",
+                    borderLeft: "4px solid #22c55e",
+                  }}
+                  elevation={0}
+                >
+                  <Avatar
+                    sx={{
+                      bgcolor: stringToColor(c.author),
+                      width: 32,
+                      height: 32,
+                      mr: 1,
+                    }}
                   >
-                    Close
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    disabled={!baseBranch || !compareBranch || compareLoading}
-                    onClick={handleCompareBranches}
-                  >
-                    {compareLoading ? "Comparing..." : "Compare"}
-                  </Button>
-                </DialogActions>
-              </Dialog>
+                    {c.author?.[0]?.toUpperCase() ?? "?"}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        fontWeight: 700,
+                        wordBreak: "break-word",
+                        color: "#111"
+                      }}
+                    >
+                      {c.message}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "#555", fontWeight: 500 }}
+                    >
+                      <span style={{ color: "#0e8c3f" }}>
+                        {c.author}
+                      </span>
+                      {c.hash && (
+                        <Tooltip title={c.hash}>
+                          <Button
+                            size="small"
+                            sx={{
+                              ml: 1,
+                              color: "#166534",
+                              fontFamily: "monospace",
+                              minWidth: 0,
+                            }}
+                            onClick={() =>
+                              navigator.clipboard.writeText(
+                                c.hash,
+                              )
+                            }
+                          >
+                            #{c.hash.slice(0, 7)}
+                            <ContentCopyIcon
+                              sx={{ fontSize: 18, ml: 0.5 }}
+                            />
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Typography>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          ) : (
+            <Typography
+              variant="body2"
+              sx={{ color: "#64748b", pl: 1.5 }}
+            >
+              None
+            </Typography>
+          )}
+        </Box>
+        {/* Files Changed Table (conditional on showChangeset) */}
+        {showChangeset && (
+          <>
+            {compareResult.stats?.length > 0 ? (
+              <Paper
+                variant="outlined"
+                sx={{ mb: 1, p: 1, bgcolor: "#f4f6fb" }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 700, mb: 1, color: "#111" }}
+                >
+                  Files Changed ({compareResult.stats.length})
+                </Typography>
+                <Box
+                  component="table"
+                  sx={{ width: "100%", fontSize: 15 }}
+                >
+                  <thead>
+                    <tr style={{ color: "#64748b" }}>
+                      <th align="left">File</th>
+                      <th align="right">+ Added</th>
+                      <th align="right">– Deleted</th>
+                      <th align="right">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compareResult.stats.map((row, idx) => (
+                      <tr key={row.file}>
+                        <td style={{ wordBreak: "break-all", color: "#111" }}>
+                          {row.file}
+                        </td>
+                        <td
+                          align="right"
+                          style={{ color: "#16a34a" }}
+                        >
+                          +{row.added}
+                        </td>
+                        <td
+                          align="right"
+                          style={{ color: "#dc2626" }}
+                        >
+                          -{row.deleted}
+                        </td>
+                        <td
+                          align="right"
+                          style={{
+                            fontWeight: 700,
+                            color:
+                              row.net > 0
+                                ? "#166534"
+                                : row.net < 0
+                                  ? "#dc2626"
+                                  : "#64748b",
+                          }}
+                        >
+                          {row.net}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Box>
+              </Paper>
+            ) : (
+              <Typography
+                variant="body2"
+                sx={{ color: "#64748b", pl: 1.5 }}
+              >
+                No files changed.
+              </Typography>
+            )}
+          </>
+        )}
+      </Paper>
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button
+      onClick={() => setCompareDialogOpen(false)}
+      variant="outlined"
+      sx={{
+        fontWeight: 700,
+        borderRadius: 2,
+        color: "#111",
+        borderColor: "#111",
+        backgroundColor: "#fff",
+        "&:hover": {
+          backgroundColor: "#f3f4f6",
+          borderColor: "#111",
+          color: "#111",
+        },
+      }}
+    >
+      Close
+    </Button>
+    <Button
+      variant="outlined"
+      disabled={!baseBranch || !compareBranch || compareLoading}
+      onClick={handleCompareBranches}
+      sx={{
+        fontWeight: 700,
+        borderRadius: 2,
+        color: "#111",
+        borderColor: "#111",
+        backgroundColor: "#fff",
+        "&:hover": {
+          backgroundColor: "#f3f4f6",
+          borderColor: "#111",
+          color: "#111",
+        },
+      }}
+    >
+      {compareLoading ? "Comparing..." : "Compare"}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+
             </Menu>
           )}
         </Box>
@@ -1994,9 +2129,17 @@ const getDefaultStashMessage = (branchName) => {
 </AppButton>
 
 
-<Dialog open={stashDialogOpen} onClose={() => setStashDialogOpen(false)} maxWidth="xs" fullWidth>
-  <DialogTitle>Stash Actions</DialogTitle>
-  <DialogContent>
+<Dialog
+  open={stashDialogOpen}
+  onClose={() => setStashDialogOpen(false)}
+  maxWidth="xs"
+  fullWidth
+  PaperProps={{
+    sx: { backgroundColor: "#fff" }  // White background for dialog
+  }}
+>
+  <DialogTitle sx={{ color: "#111" }}>Stash Actions</DialogTitle>
+  <DialogContent sx={{ backgroundColor: "#fff" }}>
     <RadioGroup
       row
       value={stashAction}
@@ -2004,16 +2147,31 @@ const getDefaultStashMessage = (branchName) => {
         const action = e.target.value;
         setStashAction(action);
         if (action === "unstash") {
-          setSelectedUnstashMsg(null); // Clear prior selection!
+          setSelectedUnstashMsg(null);
           loadUnstashList();
         }
       }}
       sx={{ mb: 2 }}
     >
-      <FormControlLabel value="stash" control={<Radio sx={{ color: "#fff", '&.Mui-checked': { color: "#0ea5e9" } }}/>} label="Stash" />
-      <FormControlLabel value="unstash" control={<Radio sx={{ color: "#fff", '&.Mui-checked': { color: "#0ea5e9" } }} />} label="Unstash" />
+      <FormControlLabel
+        value="stash"
+        control={
+          <Radio
+            sx={{ color: "#111", "&.Mui-checked": { color: "#0ea5e9" } }}
+          />
+        }
+        label="Stash"
+      />
+      <FormControlLabel
+        value="unstash"
+        control={
+          <Radio
+            sx={{ color: "#111", "&.Mui-checked": { color: "#0ea5e9" } }}
+          />
+        }
+        label="Unstash"
+      />
     </RadioGroup>
-
 
     {stashAction === "stash" && (
       <TextField
@@ -2025,98 +2183,160 @@ const getDefaultStashMessage = (branchName) => {
         value={stashMessage}
         onChange={e => setStashMessage(e.target.value)}
         placeholder='e.g. "WIP: fixing login bug"'
+        sx={{
+          backgroundColor: "#fff",
+          borderRadius: 1,
+          "& .MuiInputBase-root": { backgroundColor: "#fff" },
+          "& .MuiInputBase-input": { color: "#111" },
+          "& .MuiInputLabel-root": { color: "#111" },
+          "& .MuiFormHelperText-root": { color: "#666" }
+        }}
       />
     )}
 
-
     {stashAction === "unstash" && (
       <>
-   <Autocomplete
-  loading={isStashListLoading}
-  options={unstashList}
-  // Show only the user's custom message (truncated)
-  getOptionLabel={option =>
-    option && option.message
-      ? (() => {
-          const cleanMsg = extractUserStashMessage(option.message, currentBranch);
-          return cleanMsg.length > 80 ? cleanMsg.slice(0, 80) + '...' : cleanMsg;
-        })()
-      : option?.ref || ''
-  }
-  value={selectedUnstashMsg}
-  onChange={(_, val) => setSelectedUnstashMsg(val)}
-  isOptionEqualToValue={(option, value) => option.ref === value?.ref}
-  // Show ref and clean message, with branch in faded style if you like
-  renderOption={(props, option) => {
-    const cleanMsg = extractUserStashMessage(option.message, currentBranch);
-    return (
-      <li
-        {...props}
-        key={option.ref}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          marginBottom: 2,
-          borderBottom: "1px solid #e5e7eb",
-          paddingBottom: 6,
-        }}
-      >
-        <span style={{ fontSize: "13px", color: "#64748b", marginBottom: 2 }}>
-          <code style={{ background: "#e0e7ef", borderRadius: 4, padding: "0 4px", marginRight: 6 }}>
-            {option.ref}
-          </code>
-        </span>
-        <span
-          style={{
-            fontSize: "15px",
-            color: "#171717",
-            wordBreak: "break-word",
-            lineHeight: 1.3,
-            maxWidth: 380,
+        <Autocomplete
+          loading={isStashListLoading}
+          options={unstashList}
+          getOptionLabel={option =>
+            option && option.message
+              ? (() => {
+                  const cleanMsg = extractUserStashMessage(
+                    option.message,
+                    currentBranch
+                  );
+                  return cleanMsg.length > 80
+                    ? cleanMsg.slice(0, 80) + "..."
+                    : cleanMsg;
+                })()
+              : option?.ref || ""
+          }
+          value={selectedUnstashMsg}
+          onChange={(_, val) => setSelectedUnstashMsg(val)}
+          isOptionEqualToValue={(option, value) => option.ref === value?.ref}
+          renderOption={(props, option) => {
+            const cleanMsg = extractUserStashMessage(
+              option.message,
+              currentBranch
+            );
+            return (
+              <li
+                {...props}
+                key={option.ref}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  marginBottom: 2,
+                  borderBottom: "1px solid #e0e0e0",
+                  paddingBottom: 6
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "13px",
+                    color: "#64748b",
+                    marginBottom: 2
+                  }}
+                >
+                  <code
+                    style={{
+                      background: "#e0e7ef",
+                      borderRadius: 4,
+                      padding: "0 4px",
+                      marginRight: 6
+                    }}
+                  >
+                    {option.ref}
+                  </code>
+                </span>
+                <span
+                  style={{
+                    fontSize: "15px",
+                    color: "#171717",
+                    wordBreak: "break-word",
+                    lineHeight: 1.3,
+                    maxWidth: 380
+                  }}
+                  title={cleanMsg}
+                >
+                  {cleanMsg.length > 90
+                    ? cleanMsg.slice(0, 90) + "..."
+                    : cleanMsg}
+                </span>
+              </li>
+            );
           }}
-          title={cleanMsg}
-        >
-          {cleanMsg.length > 90 ? cleanMsg.slice(0, 90) + '...' : cleanMsg}
-        </span>
-      </li>
-    );
-  }}
-  renderInput={params => (
-    <TextField
-      {...params}
-      label="Select stash message to pop"
-      margin="dense"
-      fullWidth
-      InputProps={{
-        ...params.InputProps,
-        endAdornment: (
-          <>
-            {isStashListLoading ? <CircularProgress color="primary" size={20} /> : null}
-            {params.InputProps.endAdornment}
-          </>
-        ),
-      }}
-    />
-  )}
-  noOptionsText="No stashes for this branch"
-  disabled={isStashListLoading || unstashList.length === 0}
-/>
-
+          renderInput={params => (
+            <TextField
+              {...params}
+              label="Select stash message to pop"
+              margin="dense"
+              fullWidth
+              InputProps={{
+                ...params.InputProps,
+                endAdornment: (
+                  <>
+                    {isStashListLoading ? (
+                      <CircularProgress color="inherit" size={20} />
+                    ) : null}
+                    {params.InputProps.endAdornment}
+                  </>
+                )
+              }}
+              sx={{
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                "& .MuiInputBase-input": { color: "#111" },
+                "& .MuiInputLabel-root": { color: "#111" },
+                "& .MuiFormHelperText-root": { color: "#666" },
+                border: "1px solid #d1d5db",
+              }}
+            />
+          )}
+          noOptionsText="No stashes for this branch"
+          disabled={isStashListLoading || unstashList.length === 0}
+          PaperComponent={({ children }) => (
+            <Box
+              sx={{
+                backgroundColor: "#fff",
+                border: "1px solid #e5e7eb",
+                color: "#111",
+                "& .MuiAutocomplete-option": {
+                  borderBottom: "1px solid #e5e7eb"
+                },
+                "& .MuiAutocomplete-option:last-child": {
+                  borderBottom: "none"
+                }
+              }}
+            >
+              {children}
+            </Box>
+          )}
+        />
 
         {!isStashListLoading && unstashList.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: "center" }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 1, textAlign: "center" }}
+          >
             No stashes found for this branch.
           </Typography>
         )}
       </>
     )}
   </DialogContent>
-  <DialogActions>
+  <DialogActions sx={{ backgroundColor: "#fff" }}>
     <Button
       onClick={() => setStashDialogOpen(false)}
       disabled={isStashListLoading}
-    >Cancel</Button>
+      sx={{ color: "#111" }} // Black text cancel
+    >
+      Cancel
+    </Button>
     <Button
       variant="contained"
       onClick={async () => {
@@ -2131,7 +2351,8 @@ const getDefaultStashMessage = (branchName) => {
             const data = await resp.json();
             setSnackbar({
               open: true,
-              message: data.message || (data.success ? "Stashed!" : "Failed to stash"),
+              message:
+                data.message || (data.success ? "Stashed!" : "Failed to stash"),
               severity: data.success ? "success" : "error"
             });
           } else if (stashAction === "unstash") {
@@ -2144,7 +2365,6 @@ const getDefaultStashMessage = (branchName) => {
               setIsStashing(false);
               return;
             }
-            // You can POST either .message or .ref depending on your API design
             const resp = await fetch(`${API_URL}/unstash`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -2153,7 +2373,8 @@ const getDefaultStashMessage = (branchName) => {
             const data = await resp.json();
             setSnackbar({
               open: true,
-              message: data.message || (data.success ? "Unstashed!" : "Failed to unstash"),
+              message:
+                data.message || (data.success ? "Unstashed!" : "Failed to unstash"),
               severity: data.success ? "success" : "error"
             });
           }
@@ -2172,11 +2393,28 @@ const getDefaultStashMessage = (branchName) => {
         (stashAction === "stash" && !stashMessage.trim()) ||
         (stashAction === "unstash" && !selectedUnstashMsg)
       }
+      sx={{
+        backgroundColor: "#111", // Black button background
+        color: "#fff",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 3,
+        py: 1,
+        textTransform: "none",
+        "&:hover": {
+          backgroundColor: "#222"
+        },
+        "&.Mui-disabled": {
+          backgroundColor: "#cacaca",
+          color: "#fff"
+        }
+      }}
     >
       {isStashing ? "Processing..." : "Confirm"}
     </Button>
   </DialogActions>
 </Dialog>
+
 
             <FloatingWhiteTooltip
               title={
@@ -2379,45 +2617,51 @@ const getDefaultStashMessage = (branchName) => {
     )}
   </DialogContent>
   <DialogActions sx={{ px: 3, pb: 2, bgcolor: "#fff" }}>
+  <Button
+  onClick={() => setRemoveRemoteDialogOpen(false)}
+  sx={{
+    color: "#2C2D2D",            // light black color hex
+    fontWeight: 700,
+    borderRadius: 2,
+    textTransform: "none",
+    fontSize: 16,
+    border: "1.5px solid #2C2D2D", // border matching text color
+    background: "#f9fafb",       // very light background for contrast
+    "&:hover": {
+      color: "#1f2020",          // slightly darker on hover
+      border: "1.5px solid #1f2020",
+      background: "#e5e7eb",     // subtle background on hover
+    },
+  }}
+  variant="outlined"
+>
+  Cancel
+</Button>
+
     <Button
-      onClick={() => setRemoveRemoteDialogOpen(false)}
-      sx={{
-        color: "#2563eb",
-        fontWeight: 700,
-        borderRadius: 2,
-        textTransform: "none",
-        fontSize: 16,
-        border: "1.5px solid #38bdf8",
-        background: "#f0f9ff",
-        "&:hover": {
-          color: "#0ea5e9",
-          border: "1.5px solid #0ea5e9",
-          background: "#bae6fd",
-        },
-      }}
-      variant="outlined"
-    >
-      Cancel
-    </Button>
-    <Button
-      variant="contained"
-      color="error"
-      disabled={!selectedRemote}
-      onClick={handleDeleteRemote}
-      sx={{
-        fontWeight: 700,
-        fontSize: 16,
-        textTransform: "none",
-        borderRadius: 2,
-        alignItems: "center",
-        px: 3,
-        py: 1,
-        background: "#dc2626",
-        "&:hover": { background: "#b91c1c" },
-      }}
-    >
-      Delete
-    </Button>
+  variant="contained"
+  disabled={!selectedRemote}
+  onClick={handleDeleteRemote}
+  sx={{
+    fontWeight: 700,
+    fontSize: 16,
+    textTransform: "none",
+    borderRadius: 2,
+    alignItems: "center",
+    px: 3,
+    py: 1,
+    backgroundColor: "#111",   // black background
+    color: "#fff",             // white text
+    "&:hover": { backgroundColor: "#222" },
+    "&.Mui-disabled": {
+      backgroundColor: "#999",
+      color: "#2C2D2D",
+    },
+  }}
+>
+  Delete
+</Button>
+
   </DialogActions>
 </Dialog>
 
@@ -2567,7 +2811,7 @@ const getDefaultStashMessage = (branchName) => {
     setNewRemoteName("");
     setNewRemoteUrl("");
   }}
-  maxWidth="xs"
+  maxWidth="sm"
   fullWidth
   PaperProps={{
     sx: {
@@ -2692,165 +2936,275 @@ const getDefaultStashMessage = (branchName) => {
 </Dialog>
  {/* Create Branch Dialog */}
  <Dialog
-          open={createBranchDialogOpen}
-          onClose={() => setCreateBranchDialogOpen(false)}
-          maxWidth="xs"
-          fullWidth
+  open={createBranchDialogOpen}
+  onClose={() => setCreateBranchDialogOpen(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: { backgroundColor: "#fff" }
+  }}
+>
+  <DialogTitle sx={{ display: "flex", alignItems: "center", color: "#111" }}>
+    Create New Branch
+    <IconButton
+      sx={{ ml: "auto", color: "#111" }}
+      onClick={() => setCreateBranchDialogOpen(false)}
+      aria-label="close"
+    >
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent dividers sx={{ backgroundColor: "#fff" }}>
+    {/* Remote Repo Autocomplete */}
+    <Autocomplete
+      options={remotes}
+      value={createBranchRemote}
+      onChange={(_, val) => {
+        setCreateBranchRemote(val ?? "");
+        setCreateBranchTarget("");
+      }}
+      freeSolo={false}
+      PaperComponent={({ children }) => (
+        <Box
+          sx={{
+            backgroundColor: "#fff",
+            border: "1px solid #e5e7eb",
+            color: "#111",
+            "& .MuiAutocomplete-option": { borderBottom: "1px solid #e5e7eb" },
+            "& .MuiAutocomplete-option:last-child": { borderBottom: "none" },
+          }}
         >
-          <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
-            Create New Branch
-            <IconButton
-              sx={{ ml: "auto" }}
-              onClick={() => setCreateBranchDialogOpen(false)}
-              aria-label="close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
-            <Autocomplete
-              options={remotes}
-              value={createBranchRemote}
-              onChange={(_, val) => {
-                setCreateBranchRemote(val ?? "");
-                setCreateBranchTarget("");
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Remote Repo"
-                  fullWidth
-                  margin="dense"
-                />
-              )}
-              freeSolo={false}
-            />
+          {children}
+        </Box>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Remote Repo"
+          fullWidth
+          margin="dense"
+          sx={{
+            "& .MuiInputBase-root": {
+              backgroundColor: "#fff",
+              color: "#111",
+              borderRadius: 1,
+              border: "1px solid #d1d5db",
+            },
+            "& .MuiInputBase-input": { color: "#111" },
+            "& .MuiInputLabel-root": { color: "#111" },
+            "& .MuiFormHelperText-root": { color: "#666" },
+          }}
+        />
+      )}
+    />
 
-            {/* Target Branch input / autocomplete */}
-            {createBranchRemote === "" ? (
-              <TextField
-                label="Target Branch"
-                fullWidth
-                margin="dense"
-                disabled
-                value=""
-                helperText="Select a remote first"
-              />
-            ) : createBranchRemote === "aclp" ? (
-              <Autocomplete
-                freeSolo
-                options={["aclp_develop"]}
-                value={createBranchTarget}
-                onChange={(_, val) => setCreateBranchTarget(val ?? "")}
-                onInputChange={(_, val) => setCreateBranchTarget(val)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Target Branch"
-                    fullWidth
-                    margin="dense"
-                    helperText="Autocomplete: aclp_develop"
-                  />
-                )}
-              />
-            ) : createBranchRemote === "linode" ? (
-              <Autocomplete
-                freeSolo
-                options={["develop", "staging"]}
-                value={createBranchTarget}
-                onChange={(_, val) => setCreateBranchTarget(val ?? "")}
-                onInputChange={(_, val) => setCreateBranchTarget(val)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Target Branch"
-                    fullWidth
-                    margin="dense"
-                    helperText="Autocomplete: de, develop, staging"
-                  />
-                )}
-              />
-            ) : (
-              <TextField
-                label="Target Branch"
-                fullWidth
-                margin="dense"
-                value={createBranchTarget}
-                onChange={(e) => setCreateBranchTarget(e.target.value)}
-                helperText="Enter target branch"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            )}
+    {/* Target Branch input / autocomplete */}
+    {createBranchRemote === "" ? (
+      <TextField
+        label="Target Branch"
+        fullWidth
+        margin="dense"
+        disabled
+        value=""
+        helperText="Select a remote first"
+        sx={{
+          "& .MuiInputBase-root": {
+            backgroundColor: "#fff",
+            color: "#111",
+            borderRadius: 1,
+            border: "1px solid #d1d5db",
+          },
+          "& .MuiInputBase-input": { color: "#111" },
+          "& .MuiInputLabel-root": { color: "#111" },
+          "& .MuiFormHelperText-root": { color: "#666" },
+        }}
+      />
+    ) : createBranchRemote === "aclp" ? (
+      <Autocomplete
+        freeSolo
+        options={["aclp_develop"]}
+        value={createBranchTarget}
+        onChange={(_, val) => setCreateBranchTarget(val ?? "")}
+        onInputChange={(_, val) => setCreateBranchTarget(val)}
+        PaperComponent={({ children }) => (
+          <Box
+            sx={{
+              backgroundColor: "#fff",
+              border: "1px solid #e5e7eb",
+              color: "#111",
+              "& .MuiAutocomplete-option": { borderBottom: "1px solid #e5e7eb" },
+              "& .MuiAutocomplete-option:last-child": { borderBottom: "none" },
+            }}
+          >
+            {children}
+          </Box>
+        )}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Target Branch"
+            fullWidth
+            margin="dense"
+            helperText="Autocomplete: aclp_develop"
+            sx={{
+              "& .MuiInputBase-root": {
+                backgroundColor: "#fff",
+                color: "#111",
+                borderRadius: 1,
+                border: "1px solid #d1d5db",
+              },
+              "& .MuiInputBase-input": { color: "#111" },
+              "& .MuiInputLabel-root": { color: "#111" },
+              "& .MuiFormHelperText-root": { color: "#666" },
+            }}
+          />
+        )}
+      />
+    ) : createBranchRemote === "linode" ? (
+      <Autocomplete
+        freeSolo
+        options={["develop", "staging"]}
+        value={createBranchTarget}
+        onChange={(_, val) => setCreateBranchTarget(val ?? "")}
+        onInputChange={(_, val) => setCreateBranchTarget(val)}
+        PaperComponent={({ children }) => (
+          <Box
+            sx={{
+              backgroundColor: "#fff",
+              border: "1px solid #e5e7eb",
+              color: "#111",
+              "& .MuiAutocomplete-option": { borderBottom: "1px solid #e5e7eb" },
+              "& .MuiAutocomplete-option:last-child": { borderBottom: "none" },
+            }}
+          >
+            {children}
+          </Box>
+        )}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Target Branch"
+            fullWidth
+            margin="dense"
+            helperText="Autocomplete: de, develop, staging"
+            sx={{
+              "& .MuiInputBase-root": {
+                backgroundColor: "#fff",
+                color: "#111",
+                borderRadius: 1,
+                border: "1px solid #d1d5db",
+              },
+              "& .MuiInputBase-input": { color: "#111" },
+              "& .MuiInputLabel-root": { color: "#111" },
+              "& .MuiFormHelperText-root": { color: "#666" },
+            }}
+          />
+        )}
+      />
+    ) : (
+      <TextField
+        label="Target Branch"
+        fullWidth
+        margin="dense"
+        value={createBranchTarget}
+        onChange={(e) => setCreateBranchTarget(e.target.value)}
+        helperText="Enter target branch"
+        autoComplete="off"
+        spellCheck={false}
+        sx={{
+          "& .MuiInputBase-root": {
+            backgroundColor: "#fff",
+            color: "#111",
+            borderRadius: 1,
+            border: "1px solid #d1d5db",
+          },
+          "& .MuiInputBase-input": { color: "#111" },
+          "& .MuiInputLabel-root": { color: "#111" },
+          "& .MuiFormHelperText-root": { color: "#666" },
+        }}
+      />
+    )}
 
-            <TextField
-              label="New Branch Name"
-              fullWidth
-              margin="dense"
-              value={createBranchName}
-              onChange={(e) => setCreateBranchName(e.target.value)}
-              helperText="Short descriptive name (no spaces)"
-            />
+    <TextField
+      label="New Branch Name"
+      fullWidth
+      margin="dense"
+      value={createBranchName}
+      onChange={(e) => setCreateBranchName(e.target.value)}
+      helperText="Short descriptive name (no spaces)"
+      sx={{
+        "& .MuiInputBase-root": {
+          backgroundColor: "#fff",
+          color: "#111",
+          borderRadius: 1,
+          border: "1px solid #d1d5db",
+        },
+        "& .MuiInputBase-input": { color: "#111" },
+        "& .MuiInputLabel-root": { color: "#111" },
+        "& .MuiFormHelperText-root": { color: "#666" },
+      }}
+    />
 
-            <Box
-              sx={{ mt: 2, color: "#6b7280", fontSize: 14, position: "sticky" }}
-            >
-              <strong>Will Create:</strong>{" "}
-              <span
-                style={{
-                  background: "linear-gradient(90deg,#0ea5e9,#2563eb,#f43f5e)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontWeight: 700,
-                }}
-              >
-                {createBranchName && createBranchRemote ? (
-                  `${createBranchName}_${createBranchRemote}_${new Date().toLocaleString(
-                    "en-US",
-                    {
-                      month: "long",
-                    },
-                  )}_${String(new Date().getDate()).padStart(2, "0")}`
-                ) : (
-                  <i>Complete form above</i>
-                )}
-              </span>
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={
-                !createBranchRemote ||
-                !createBranchTarget ||
-                !createBranchName ||
-                isSubmittingCreate
-              }
-              onClick={handleCreateBranch}
-              startIcon={
-                isSubmittingCreate ? (
-                  <CircularProgress color="inherit" size={18} />
-                ) : (
-                  <AddIcon />
-                )
-              }
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                borderRadius: 2,
-                px: 2.5,
-                py: 1,
-              }}
-            >
-              {isSubmittingCreate ? "Creating..." : "Create Branch"}
-            </Button>
+    <Box sx={{ mt: 2, color: "#6b7280", fontSize: 14, position: "sticky" }}>
+      <strong>Will Create:</strong>{" "}
+      <span
+        style={{
+          background: "linear-gradient(90deg,#0ea5e9,#2563eb,#f43f5e)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          fontWeight: 700,
+        }}
+      >
+        {createBranchName && createBranchRemote ? (
+          `${createBranchName}_${createBranchRemote}_${new Date().toLocaleString(
+            "en-US", { month: "long" }
+          )}_${String(new Date().getDate()).padStart(2, "0")}`
+        ) : (
+          <i>Complete form above</i>
+        )}
+      </span>
+    </Box>
+  </DialogContent>
+  <DialogActions sx={{ backgroundColor: "#fff" }}>
+    <Button
+      variant="contained"
+      disabled={
+        !createBranchRemote || !createBranchTarget || !createBranchName || isSubmittingCreate
+      }
+      onClick={handleCreateBranch}
+      startIcon={
+        isSubmittingCreate ? (
+          <CircularProgress color="inherit" size={18} />
+        ) : (
+          <AddIcon />
+        )
+      }
+      sx={{
+        backgroundColor: "#111",
+        color: "#fff",
+        textTransform: "none",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        "&:hover": { backgroundColor: "#222" },
+        "&.Mui-disabled": {
+          backgroundColor: "#cacaca",
+          color: "#fff",
+        },
+      }}
+    >
+      {isSubmittingCreate ? "Creating..." : "Create Branch"}
+    </Button>
 
-            <Button onClick={() => setCreateBranchDialogOpen(false)}>
-              Cancel
-            </Button>
-          </DialogActions>
-        </Dialog>
+    <Button
+      onClick={() => setCreateBranchDialogOpen(false)}
+      sx={{ color: "#111" }}
+    >
+      Cancel
+    </Button>
+  </DialogActions>
+</Dialog>
 
 
         {/* Force Pull Confirm Dialog */}
@@ -2882,20 +3236,34 @@ const getDefaultStashMessage = (branchName) => {
   open={checkoutDialogOpen}
   onClose={(event, reason) => {
     if (isCheckingOut && (reason === "backdropClick" || reason === "escapeKeyDown")) {
-      return; // prevent closing while loading
+      return;
     }
     setCheckoutDialogOpen(false);
   }}
-  maxWidth="xs"
+  maxWidth="sm"
   fullWidth
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff",
+      color: "#111",
+      borderRadius: 3,
+    }
+  }}
 >
-  {/* LinearProgress at the very top */}
-  {isCheckingOut && <LinearProgress  color="primary"/>}
-
-  <DialogTitle>
+  {/* Show a loading bar at top when in progress */}
+  {isCheckingOut && <LinearProgress color="primary" />}
+  
+  <DialogTitle
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      color: "#0284c7",
+      fontWeight: 700
+    }}
+  >
     Checkout Branch
     <IconButton
-      sx={{ ml: "auto" }}
+      sx={{ ml: "auto", color: "#111" }}
       onClick={() => {
         if (!isCheckingOut) setCheckoutDialogOpen(false);
       }}
@@ -2905,32 +3273,60 @@ const getDefaultStashMessage = (branchName) => {
       <CloseIcon />
     </IconButton>
   </DialogTitle>
-
-  <DialogContent dividers sx={{ bgcolor: "#232642", color: "#e5e7eb" }}>
-  <TextField
-  label="Branch Name"
-  fullWidth
-  margin="dense"
-  value={checkoutBranchName}
-  disabled={true}                 // <-- DISABLE TEXT FIELD
-  inputProps={{ readOnly: true }} // <-- PREVENT TYPING, shows as readonly
-  autoComplete="off"
-  spellCheck={false}
-  helperText="Selected branch to checkout"
-  autoFocus
-/>
+  <DialogContent dividers sx={{ bgcolor: "#fff", color: "#111" }}>
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        minHeight: 56,
+        mb: 1.5,
+      }}
+    >
+      <Box sx={{ fontWeight: 700, fontSize: 16 }}>
+        Branch Name:
+      </Box>
+      <Box
+        sx={{
+          display: "inline-block",
+          px: 2,
+          py: 1,
+          bgcolor: "#f7fafc",
+          color: "#111",
+          border: "1.5px solid #d1d5db",
+          borderRadius: 2,
+          fontSize: 17,
+          fontWeight: 700,
+          letterSpacing: 0.2,
+        }}
+      >
+        {checkoutBranchName}
+      </Box>
+    </Box>
   </DialogContent>
-
-  <DialogActions>
+  <DialogActions sx={{ bgcolor: "#fff" }}>
     <Button
       onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
       disabled={isCheckingOut}
+      variant="outlined"
+      sx={{
+        color: "#111",
+        borderColor: "#111",
+        bgcolor: "#fff",
+        fontWeight: 700,
+        borderRadius: 2,
+        minWidth: 120,
+        "&:hover": {
+          bgcolor: "#f3f4f6",
+          borderColor: "#111",
+          color: "#111",
+        },
+      }}
     >
       Cancel
     </Button>
     <Button
-      variant="contained"
-      color="primary"
+      variant="outlined"
       disabled={!checkoutBranchName.trim() || isCheckingOut}
       onClick={handleCheckoutBranch}
       startIcon={
@@ -2938,164 +3334,253 @@ const getDefaultStashMessage = (branchName) => {
           <CircularProgress color="inherit" size={18} />
         ) : null
       }
-      sx={{ minWidth: 120 }}
+      sx={{
+        color: "#111",
+        borderColor: "#111",
+        bgcolor: "#fff",
+        fontWeight: 700,
+        borderRadius: 2,
+        minWidth: 120,
+        "&:hover": {
+          bgcolor: "#f3f4f6",
+          borderColor: "#111",
+          color: "#111",
+        },
+      }}
     >
       {isCheckingOut ? "Checking out..." : "Checkout"}
     </Button>
   </DialogActions>
 </Dialog>
 
-        {/* Environment Switcher Dialog */}
-        <Dialog
-          open={envSwitcherOpen}
-          onClose={handleCloseEnvSwitcher}
-          maxWidth="xs"
-          fullWidth
+
+<Dialog
+  open={envSwitcherOpen}
+  onClose={handleCloseEnvSwitcher}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: { backgroundColor: "#fff" } // main dialog white
+  }}
+>
+  <DialogTitle sx={{ display: "flex", alignItems: "center", color: "#111" }}>
+    Switch Environment
+    <IconButton
+      sx={{ ml: "auto", color: "#111" }}
+      onClick={handleCloseEnvSwitcher}
+      aria-label="close"
+    >
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent dividers sx={{ backgroundColor: "#fff", color: "#111" }}>
+    <Autocomplete
+      options={ENV_OPTIONS}
+      value={selectedEnv}
+      onChange={(_, value) => setSelectedEnv(value)}
+      PaperComponent={({ children }) => (
+        <Box
+          sx={{
+            backgroundColor: "#fff",
+            border: "1px solid #e5e7eb",
+            color: "#111",
+            "& .MuiAutocomplete-option": {
+              borderBottom: "1px solid #e5e7eb",
+            },
+            "& .MuiAutocomplete-option:last-child": {
+              borderBottom: "none",
+            },
+          }}
         >
-          <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
-            Switch Environment
-            <IconButton
-              sx={{ ml: "auto" }}
-              onClick={handleCloseEnvSwitcher}
-              aria-label="close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers sx={{ bgcolor: "#232642", color: "#e5e7eb" }}>
-            <Autocomplete
-              options={ENV_OPTIONS}
-              value={selectedEnv}
-              onChange={(_, value) => setSelectedEnv(value)}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Environment"
-                  fullWidth
-                  margin="dense"
-                  autoFocus
-                />
-              )}
-            />
-            {envMessage && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {envMessage}
-              </Alert>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEnvSwitcher} disabled={envLoading}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={!selectedEnv || envLoading}
-              onClick={handleConfirmEnvSwitch}
-              startIcon={
-                envLoading ? (
-                  <CircularProgress color="inherit" size={18} />
-                ) : null
-              }
-            >
-        {envLoading ? "Switching..." : "Confirm"}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      {/* 🔍 Search Box */}
+          {children}
+        </Box>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Environment"
+          fullWidth
+          margin="dense"
+          autoFocus
+          sx={{
+            "& .MuiInputBase-root": {
+              backgroundColor: "#fff",
+              color: "#111",
+              borderRadius: 1,
+              border: "1px solid #d1d5db",
+            },
+            "& .MuiInputBase-input": { color: "#111" },
+            "& .MuiInputLabel-root": { color: "#111" },
+            "& .MuiFormHelperText-root": { color: "#666" },
+          }}
+        />
+      )}
+    />
+    {envMessage && (
+      <Alert severity="error" sx={{ mt: 2 }}>
+        {envMessage}
+      </Alert>
+    )}
+  </DialogContent>
+  <DialogActions sx={{ backgroundColor: "#fff" }}>
+    <Button
+      onClick={handleCloseEnvSwitcher}
+      disabled={envLoading}
+      sx={{ color: "#111" }} // black text
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="contained"
+      disabled={!selectedEnv || envLoading}
+      onClick={handleConfirmEnvSwitch}
+      startIcon={
+        envLoading ? (
+          <CircularProgress color="inherit" size={18} />
+        ) : null
+      }
+      sx={{
+        backgroundColor: "#111",
+        color: "#fff",
+        textTransform: "none",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        "&:hover": { backgroundColor: "#222" },
+        "&.Mui-disabled": {
+          backgroundColor: "#cacaca",
+          color: "#fff",
+        },
+      }}
+    >
+      {envLoading ? "Switching..." : "Confirm"}
+    </Button>
+  </DialogActions>
+</Dialog>
+
 <Box
   sx={{
     width: "100%",
     maxWidth: 1300,
     mt: 3,
-    ml: 0,
-    mr: "auto",
+    ml: 0,        // no left margin
+    mr: "auto",   // pushes box to the left
     bgcolor: "#171928",
-    borderRadius: 5,
+    borderRadius: 3,
     boxShadow: "0 8px 40px #00000030",
-    p: 2,
+    p: 0,         // remove padding if you want the content itself at the edge
   }}
 >
-  <Autocomplete
-    freeSolo
-    disablePortal
-    options={filteredSuggestions ?? []}
-    inputValue={search}
-    PaperComponent={SuggestionPaper}
-    noOptionsText="No matching branches found"
-    onInputChange={(event, newInputValue, reason) => {
-      setSearch(newInputValue);
-      if (reason === "clear" || newInputValue === "") setQuery("");
+  {/* Inner box for search and count; left-aligned */}
+  <Box
+    sx={{
+      width: "100%",
+      bgcolor: "#101221",
+      borderRadius: 2.5,
+      px: 2, // Reduce! (Was 3) for less left spacing
+      pt: 2,
+      pb: 2,
+      mb: 2,
+      boxShadow: "0px 2px 16px 0px #00000018",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start", // Ensures children are left-aligned
     }}
-    onChange={(event, newValue) => {
-      if (newValue !== null) {
-        setQuery(newValue);
-        setSearch(newValue);
-      }
-    }}
-    sx={{ flex: 1 }}
-    renderInput={(params) => (
-      <TextField
-        {...params}
-        placeholder="Search branches..."
-        fullWidth
-        sx={{
-          input: { fontSize: "1rem", py: 1.5 },
-          "& .MuiOutlinedInput-root": {
-            "& fieldset": { borderColor: "#fff" },
-            "&:hover fieldset": { borderColor: "#fff" },
-            "&.Mui-focused fieldset": { borderColor: "#fff" },
-          },
+  >
+    <Box sx={{ width: "100%", maxWidth: 900 }}>
+      {/* Set a maxWidth here if you want only a partial width search, else leave "100%" */}
+      <Autocomplete
+        freeSolo
+        disablePortal
+        options={filteredSuggestions ?? []}
+        inputValue={search}
+        PaperComponent={SuggestionPaper}
+        noOptionsText="No matching branches found"
+        onInputChange={(event, newInputValue, reason) => {
+          setSearch(newInputValue);
+          if (reason === "clear" || newInputValue === "") setQuery("");
         }}
-      />
-    )}
-    renderOption={(props, option, { selected }) => (
-      <React.Fragment key={option}>
-        <Box
-          component="li"
-          {...props}
-          sx={{
-            px: 2,
-            py: 1,
-            fontSize: 15,
-            fontWeight: 500,
-            color: "#e5e7eb",
-            borderRadius: 2,
-            background: selected ? "#232642" : "#171928",
-            "&:hover": { background: "#263041", color: "#fff" },
-            transition: "background 120ms",
-          }}
-        >
-          {option}
-        </Box>
-        {props["data-option-index"] < (filteredSuggestions?.length ?? 0) - 1 && (
-          <Divider variant="fullWidth" sx={{ ml: 2, mr: 2 }} />
+        onChange={(event, newValue) => {
+          if (newValue !== null) {
+            setQuery(newValue);
+            setSearch(newValue);
+          }
+        }}
+        sx={{ width: "100%" }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder="Search branches..."
+            fullWidth
+            InputProps={{
+              ...params.InputProps,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#7b85a9", mr: 1.5, fontSize: 28 }} />
+                </InputAdornment>
+              ),
+              sx: {
+                bgcolor: "#181a28",
+                color: "#e5e7eb",
+                borderRadius: 2,
+                border: "1.5px solid #334155",
+                fontSize: "1.3rem",
+                minHeight: 56,
+                input: {
+                  fontSize: "1.2rem",
+                  py: 2,
+                  px: 1.5,
+                  color: "#e5e7eb",
+                  height: "auto",
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  border: "none",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  border: "1.5px solid #7b85a9",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  border: "2px solid #50fa7b",
+                },
+              },
+            }}
+            InputLabelProps={{ style: { color: "#fff" } }}
+          />
         )}
-      </React.Fragment>
-    )}
-  />
+      />
+    </Box>
 
-  {/* ✅ Count below search */}
-  <Typography variant="body2" sx={{ mt: 1, color: "gray", pl: 0.5 }}>
-    {(filteredSuggestions ?? []).length} branches found
-  </Typography>
+    {/* Branch count: aligns with search input */}
+    <Typography
+      variant="body2"
+      sx={{ mt: 1.5, color: "#7b85a9", pl: "8px" }} // Adjust pl so text starts with input text
+    >
+      {(filteredSuggestions ?? []).length} branches found
+    </Typography>
+  </Box>
 </Box>
-
 <Box
   sx={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end", // 👈 moves content to right side
-    gap: 1, // space between label and branch name
     mt: 2,
+    ml: 3, // Keep alignment with table content, adjust as needed
+    bgcolor: "#232642", // Darker background matches screenshot
+    px: 2.5, // Padding left and right
+    py: 1.2, // Padding top and bottom
+    borderRadius: 2.5, // Rounded edges, tweak for more/less
+    display: "inline-flex", // Only wrap content
+    alignItems: "center",
+    boxShadow: "0 2px 12px #00000030", // Softer shadow for "floating" effect
+    maxWidth: 1, // allow full container width if needed
   }}
 >
   {/* Label */}
   <Box
     sx={{
-      fontSize: 14,
-      fontWeight: 600,
-      color: "#fff", // white text for label
+      fontSize: 20,
+      fontWeight: 500,
+      color: "#fff",
+      mr: 1 // Space between label and branch name
     }}
   >
     Current Branch:
@@ -3107,23 +3592,26 @@ const getDefaultStashMessage = (branchName) => {
       component="button"
       onClick={handleShowBranchLog}
       sx={{
-        fontSize: 14,
-        fontWeight: 600,
+        fontSize: 20,
+        fontWeight: 500,
         cursor: "pointer",
         background: "none",
         border: "none",
         outline: "none",
-        color: "#2563eb", // blue text for branch name
+        color: "#2563eb",
         whiteSpace: "nowrap",
         overflow: "hidden",
         textOverflow: "ellipsis",
-        maxWidth: "400px", // adjust as needed
+        maxWidth: "400px",
+        p: 0,
       }}
     >
       {currentBranch || "Loading..."}
     </Box>
   </FloatingWhiteTooltip>
 </Box>
+
+
 
          {/* Branch Table */}
         <Box sx={{ mb: 1 }}></Box>
@@ -3133,10 +3621,11 @@ const getDefaultStashMessage = (branchName) => {
             p: 2,
             borderRadius: 3,
             bgcolor: "#171928",
-            border: "2.5px solid #0ea5e9",
+            border: "2.5px solid #334155",
             boxShadow: "none",
             mb: 3,
           }}
+          
         >
 <Box sx={{ mt: 3, mb: 2 }}>
   <Paper
@@ -3145,8 +3634,8 @@ const getDefaultStashMessage = (branchName) => {
       p: 1.5,
       borderRadius: 3,
       bgcolor: "#171928", // Dashboard dark
-      border: "2px solid #232642", // Blue border highlight
-      boxShadow: "none", // Soft blue shadow
+      border: "2px solid #232642", // Light grey
+      boxShadow: "none", 
       minHeight: 50,
     }}
   >
@@ -3215,6 +3704,7 @@ const getDefaultStashMessage = (branchName) => {
 
               <DataGrid
               autoHeight
+              elevation={4}
               rows={branches}
               columns={columns}
               pageSize={2}
@@ -3230,20 +3720,20 @@ const getDefaultStashMessage = (branchName) => {
               getRowId={(row) => row.id}
               // checkboxSelection
               sx={{
-                border: '3px solid #64748b',      // medium grey border
+                border: '1.5px solid #334155 !important', // force grey
+                borderColor: '#334155 !important',        // force grey
                 borderRadius: '14px',
                 '& .MuiDataGrid-columnHeaders': {
-                  borderBottom: '2px solid #64748b',  // grey header bottom border
+                  borderBottom: '2px solid #64748b',
                 },
                 '& .MuiDataGrid-footerContainer': {
-                  borderTop: '2px solid #64748b',     // grey footer top border
+                  borderTop: '2px solid #64748b',
                 },
                 '&.Mui-focused, &.Mui-focusVisible': {
                   outline: 'none',
-                  borderColor: '#64748b',              // grey focus border color
+                  borderColor: '#64748b',
                 },
               }}
-              
               components={{
                 LoadingOverlay,
                 NoRowsOverlay: () => (
@@ -3257,159 +3747,168 @@ const getDefaultStashMessage = (branchName) => {
           <Typography sx={{ mt: 2, fontSize: 14, color: "#64748b" }}>
             Showing {pageSize} per page | {branches.length} branches
           </Typography>
-          <Dialog
-            open={branchLogDialogOpen}
-            onClose={() => setBranchLogDialogOpen(false)}
-            maxWidth="md"
-            PaperProps={{
-              sx: {
-                bgcolor: "#232642", 
-                color: "#e5e7eb",
-                borderRadius: 4,
-                p: 2,
-                minWidth: { xs: "95vw", sm: 540 },
-              },
+         <Dialog
+  open={branchLogDialogOpen}
+  onClose={() => setBranchLogDialogOpen(false)}
+  maxWidth="md"
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff", // White background
+      color: "#111",   // Black text
+      borderRadius: 4,
+      p: 2,
+      minWidth: { xs: "95vw", sm: 540 },
+    },
+  }}
+>
+  <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
+    Commit History ─ {currentBranch}
+  </DialogTitle>
+  <DialogContent sx={{ maxHeight: 500, overflowY: "auto", bgcolor: "#fff", color: "#111" }}>
+    {branchLogLoading ? (
+      <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
+        <CircularProgress />
+      </Box>
+    ) : branchLogError ? (
+      <Alert severity="error">{branchLogError}</Alert>
+    ) : branchLogList.length === 0 ? (
+      <Typography color="text.secondary" sx={{ my: 2 }}>
+        No commits found.
+      </Typography>
+    ) : (
+      <Box>
+        {branchLogList.map((log, idx) => (
+          <Paper
+            key={log.commit + idx}
+            sx={{
+              my: 2,
+              p: 2,
+              bgcolor: "#fff", // White background for each commit
+              boxShadow: "none",
+              borderLeft: "6px solid #0ea5e9",
             }}
           >
-            <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
-              Commit History ─ {currentBranch}
-            </DialogTitle>
-            <DialogContent sx={{ maxHeight: 500, overflowY: "auto", bgcolor: "#232642", color: "#e5e7eb" }}>
-              {branchLogLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : branchLogError ? (
-                <Alert severity="error">{branchLogError}</Alert>
-              ) : branchLogList.length === 0 ? (
-                <Typography color="text.secondary" sx={{ my: 2 }}>
-                  No commits found.
+            {/* --- Changed Part --- */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                mb: 0.6,
+                flexWrap: "wrap",
+              }}
+            >
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    color: "#2563eb",
+                    fontWeight: 700,
+                    display: "inline",
+                  }}
+                >
+                  {log.message}
                 </Typography>
-              ) : (
-                <Box>
-                  {branchLogList.map((log, idx) => (
-                    <Paper
-                      key={log.commit + idx}
-                      sx={{
-                        my: 2,
-                        p: 2,
-                        bgcolor: "#e0f2fe",
-                        boxShadow: "none",
-                        borderLeft: "6px solid #0ea5e9",
-                      }}
-                    >
-                      {/* --- HERE IS THE CHANGED PART --- */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          mb: 0.6,
-                          flexWrap: "wrap",
+                {/* Ticket links block */}
+                {log.tickets && log.tickets.length > 0 && (
+                  <span style={{ marginLeft: 10 }}>
+                    {log.tickets.map((ticket) => (
+                      <a
+                        key={ticket}
+                        href={`https://track.akamai.com/jira/browse/${ticket}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "#fff",
+                          background: "#2563eb",
+                          borderRadius: "7px",
+                          padding: "1px 7px",
+                          marginRight: "8px",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          textDecoration: "none",
+                          verticalAlign: "middle",
                         }}
                       >
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Typography
-                            variant="subtitle2"
-                            sx={{
-                              color: "#2563eb",
-                              fontWeight: 700,
-                              display: "inline",
-                            }}
-                          >
-                            {log.message}
-                          </Typography>
-                          {/* Ticket links block */}
-                          {log.tickets && log.tickets.length > 0 && (
-                            <span style={{ marginLeft: 10 }}>
-                              {log.tickets.map((ticket) => (
-                                <a
-                                  key={ticket}
-                                  href={`https://track.akamai.com/jira/browse/${ticket}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    color: "#fff",
-                                    background: "#2563eb",
-                                    borderRadius: "7px",
-                                    padding: "1px 7px",
-                                    marginRight: "8px",
-                                    fontWeight: 700,
-                                    fontSize: 13,
-                                    textDecoration: "none",
-                                    verticalAlign: "middle",
-                                  }}
-                                >
-                                  {ticket}
-                                </a>
-                              ))}
-                            </span>
-                          )}
-                        </Box>
-                        <Chip
-                          label={log.date}
-                          size="small"
-                          sx={{
-                            ml: 1,
-                            bgcolor: "#e0e7ff",
-                            color: "#334155",
-                            fontWeight: 700,
-                          }}
-                        />
-                      </Box>
-                      {/* rest of your Paper stays the same */}
-                      <Box
-                        sx={{
-                          fontSize: 14,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 3,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                          }}
-                        >
-                          <span style={{ color: "#6b7280" }}>Commit:</span>
-                          <code style={{ color: "#0284c7", fontSize: 15 }}>
-                            {log.commit.slice(0, 8)}…
-                          </code>
-                          <Tooltip title="Copy commit id">
-                            <IconButton
-                              onClick={() => handleCopyCommit(log.commit)}
-                              size="small"
-                              sx={{ ml: 0.5, color: "#0891b2" }}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                        <Box>
-                          <span style={{ color: "#6b7280" }}>Author:</span>
-                          <span style={{ fontWeight: 500, marginLeft: 6 }}>
-                            {log.author}
-                          </span>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  ))}
-                </Box>
-              )}
-            </DialogContent>
-
-            <DialogActions>
-              <Button
-                onClick={() => setBranchLogDialogOpen(false)}
-                variant="outlined"
-                sx={{ fontWeight: 700, borderRadius: 2 }}
+                        {ticket}
+                      </a>
+                    ))}
+                  </span>
+                )}
+              </Box>
+              <Chip
+                label={log.date}
+                size="small"
+                sx={{
+                  ml: 1,
+                  bgcolor: "#e0e7ff",
+                  color: "#334155",
+                  fontWeight: 700,
+                }}
+              />
+            </Box>
+            {/* rest of your Paper stays the same */}
+            <Box
+              sx={{
+                fontSize: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                flexWrap: "wrap",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
               >
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
+                <span style={{ color: "#6b7280" }}>Commit:</span>
+                <code style={{ color: "#0284c7", fontSize: 15 }}>
+                  {log.commit.slice(0, 8)}…
+                </code>
+                <Tooltip title="Copy commit id">
+                  <IconButton
+                    onClick={() => handleCopyCommit(log.commit)}
+                    size="small"
+                    sx={{ ml: 0.5, color: "#0891b2" }}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Box>
+                <span style={{ color: "#6b7280" }}>Author:</span>
+                <span style={{ fontWeight: 500, marginLeft: 6 }}>
+                  {log.author}
+                </span>
+              </Box>
+            </Box>
+          </Paper>
+        ))}
+      </Box>
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button
+      onClick={() => setBranchLogDialogOpen(false)}
+      variant="outlined"
+      sx={{
+        fontWeight: 700,
+        borderRadius: 2,
+        color: "#111",
+        borderColor: "#111",
+        "&:hover": {
+          borderColor: "#111",
+          backgroundColor: "#e5e7eb",
+        },
+      }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
+
         </Paper>
         {/* Confirm Delete Selected Snackbar */}
       {/* Confirm Delete Selected Dialog */}
@@ -3518,6 +4017,21 @@ const getDefaultStashMessage = (branchName) => {
       CANCEL
     </Button>
   </DialogActions>
+  <Snackbar
+  open={snackbar.open}
+  autoHideDuration={4000}
+  onClose={() => setSnackbar({ ...snackbar, open: false })}
+  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+>
+  <Alert
+    onClose={() => setSnackbar({ ...snackbar, open: false })}
+    severity={snackbar.severity}
+    sx={{ width: '100%' }}
+  >
+    {snackbar.message}
+  </Alert>
+</Snackbar>
+
 </Dialog>
 
       </Paper>
