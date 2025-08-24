@@ -27,7 +27,8 @@ import {
   Skeleton,
   Checkbox,
   Avatar,
-  Collapse
+  Collapse,
+  InputAdornment,
 } from "@mui/material";
 import LinearProgress from '@mui/material/LinearProgress';
 import RadioGroup from "@mui/material/RadioGroup";
@@ -58,6 +59,7 @@ import CloudOffIcon from "@mui/icons-material/CloudOff";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -88,6 +90,17 @@ const deleteBranchApi = async (branchName) => {
     };
   }
 };
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    background: {
+      default: '#10121a',
+      paper: '#171928',
+    },
+    primary: { main: '#2563eb' },
+    text: { primary: "#e5e7eb", secondary: "#a1a1aa" }
+  }
+});
 const branchTypeColors = {
   aclp: "#2563eb",      // blue (used for 'aclp')
   ankita: "#facc15",    // yellow (used for 'ankita')
@@ -404,43 +417,22 @@ const [serverError, setServerError] = useState('');
     return await response.json();
   };
 
-  const SuggestionPaper = React.forwardRef(
-    function SuggestionPaper(props, ref) {
-      const { children, branchCount, ...other } = props;
-      return (
-        <Paper
-          ref={ref}
-          sx={{
-            width: "100%",
-            minWidth: 0,
-            borderRadius: 3,
-            border: "2.5px solid #bae6fd",
-            mt: 0.2,
-            bgcolor: "#f8fafc",
-            boxShadow: "0 8px 36px -8px #bae6fd90",
-            overflow: "hidden",
-          }}
-          {...other}
-        >
-          <List disablePadding>{children}</List>
-          <Box
-            sx={{
-              px: 2,
-              py: 1,
-              borderTop: "1px solid #bae6fd",
-              fontSize: 13.5,
-              color: "#0284c7",
-              fontWeight: 500,
-              bgcolor: "#f8fafc",
-              textAlign: "right",
-            }}
-          >
-            {branchCount} {branchCount === 1 ? "branch" : "branches"} found
-          </Box>
-        </Paper>
-      );
-    },
-  );
+  const SuggestionPaper = React.forwardRef(function SuggestionPaper(props, ref) {
+    return (
+      <Paper
+        ref={ref}
+        {...props}
+        elevation={10}
+        sx={{
+          bgcolor: "#171928", // dark, matches dashboard
+          borderRadius: 2,
+          color: "#e0e7ef",
+          boxShadow: "0 8px 40px #38bdf840",
+          border: "1.5px solid #232642"
+        }}
+      />
+    );
+  });
 
   // Compute filtered suggestions based on current input
   const filteredSuggestions = suggestions.filter((opt) =>
@@ -1007,6 +999,22 @@ const getDefaultStashMessage = (branchName) => {
       }, 400);
     }
   };
+  const BUTTON_BG = {
+    primary: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)", // blue
+    green: "linear-gradient(90deg, #22c55e 60%, #4ade80 100%)",    // green
+    purple: "linear-gradient(90deg, #a21caf 60%, #e879f9 110%)",   // purple
+    red: "linear-gradient(90deg, #dc2626 60%, #f87171 110%)",      // red
+    gray: "linear-gradient(90deg, #334155 60%, #64748b 110%)",     // gray
+  };
+  
+  const BUTTON_HOVER = {
+    primary: "linear-gradient(90deg, #2563eb 80%, #38bdf8 100%)",
+    green: "linear-gradient(90deg, #16a34a 80%, #4ade80 100%)",
+    purple: "linear-gradient(90deg, #7c3aed 80%, #a21caf 100%)",
+    red: "linear-gradient(90deg, #b91c1c 80%, #dc2626 100%)",
+    gray: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+  };
+  
 
   const AppButton = ({
     children,
@@ -1014,17 +1022,18 @@ const getDefaultStashMessage = (branchName) => {
     disabled = false,
     startIcon = null,
     loading = false,
-    color = "primary",
+    color = "primary", // "green", "purple", "red", "gray" etc.
     variant = "contained",
-    size = "size",
+    size = "medium",
     sx = {},
   }) => {
-    const icon = loading ? (
-      <CircularProgress color="inherit" size={18} />
-    ) : (
-      startIcon
-    );
-
+    const icon = loading
+      ? <CircularProgress color="inherit" size={18} />
+      : startIcon;
+  
+    const bg = BUTTON_BG[color] || BUTTON_BG.primary;
+    const hoverBg = BUTTON_HOVER[color] || BUTTON_HOVER.primary;
+  
     return (
       <Button
         variant={variant}
@@ -1032,20 +1041,19 @@ const getDefaultStashMessage = (branchName) => {
         disabled={disabled || loading}
         onClick={onClick}
         startIcon={icon}
-        color={color}
         sx={{
           textTransform: "none",
           fontWeight: 500,
-          fontSize: 13,
-          borderRadius: 2,
-          px: 1.1, // Padding left and right – controls button padding, not width
-          py: 1.2, // Padding top/bottom
-          background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
+          fontSize: 14,
+          borderRadius: 2.5,
+          px: 2,
+          py: 1.2,
+          background: bg,
           color: "#fff",
           boxShadow: "0 2px 8px #0ea5e950",
           "&:hover": {
-            background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-            border: "2px solid #0ea5e9",
+            background: hoverBg,
+            border: "2px solid #fff2",
           },
           ...sx,
         }}
@@ -1054,6 +1062,7 @@ const getDefaultStashMessage = (branchName) => {
       </Button>
     );
   };
+  
 
   const handleDeleteRemote = async () => {
     if (!selectedRemote) return;
@@ -1114,6 +1123,7 @@ const getDefaultStashMessage = (branchName) => {
       });
     }
   };
+  
   const handleRunSpecs = async (specPaths) => {
     setIsRunning(true);
     setRunOutput(''); // <-- clear previous output immediately
@@ -1182,20 +1192,21 @@ const getDefaultStashMessage = (branchName) => {
     </Box>
   );
 
+  //start
   const columns = [
     {
       field: "bugTicket",
       headerName: "BugTicket",
-      minWidth: 170,
+      minWidth: 120,
       flex: 0.9,
       renderHeader: () => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1 }}>
           <img
             src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/jira.svg"
-            style={{ width: 19, height: 19, color: "#0ea5e9" }}
+            style={{ width: 19, height: 19, filter: "brightness(2)" }}
             alt="Jira"
           />
-          <span style={{ fontWeight: 700, color: "black" }}>BugTicket</span>
+          <span style={{ fontWeight: 700, color: "#fff" }}>BugTicket</span>
         </Box>
       ),
       renderCell: (params) =>
@@ -1215,13 +1226,13 @@ const getDefaultStashMessage = (branchName) => {
                 maxWidth: 170,
                 minWidth: 68,
                 height: 36,
-                fontWeight: 600,
+                fontWeight: 500,
                 fontSize: 15,
-                color: "#2563eb",
-                bgcolor: "#e0f2fe",
-                border: "2px solid #38bdf8",
+                color: "#fff",           // <-- make text white
+                 border: "2px solid #fff",// <-- make border white
+                 bgcolor: "#232642",      // stays dark
                 borderRadius: "18px",
-                boxShadow: "0 2px 8px #bae6fd22",
+                boxShadow: "0 2px 8px #38bdf821",
                 px: 2,
                 textOverflow: "ellipsis",
                 overflow: "hidden",
@@ -1229,17 +1240,17 @@ const getDefaultStashMessage = (branchName) => {
                 cursor: "pointer",
                 transition: "all .14s",
                 "&:hover": {
-                  bgcolor: "#bae6fd",
-                  color: "#2563eb",
-                  borderColor: "#2563eb",
+                  bgcolor: "#0ea5e9",
+                  color: "#fff",
+                  borderColor: "#38bdf8",
                   boxShadow: "0 4px 16px #38bdf84a",
                 },
                 "& .MuiChip-label": {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  px: 0,
-                },
+                  px: 0
+                }
               }}
             />
           </FloatingWhiteTooltip>
@@ -1252,11 +1263,11 @@ const getDefaultStashMessage = (branchName) => {
               height: 36,
               fontWeight: 600,
               fontSize: 15,
-              color: "#525252",
-              bgcolor: "#f3f4f6",
-              border: "2px dashed #d1d5db",
+              color: "#64748b",      // faded blue
+              bgcolor: "#232642",    // blend with table
+              border: "2px dashed #334155",
               borderRadius: "18px",
-              boxShadow: "0 2px 8px #e5e7eb10",
+              boxShadow: "0 2px 8px #23264233",
               px: 2,
               textOverflow: "ellipsis",
               overflow: "hidden",
@@ -1265,21 +1276,20 @@ const getDefaultStashMessage = (branchName) => {
           />
         ),
     },
-
     {
       field: "name",
       headerName: "Branch Name",
-      minWidth: 240,
+      minWidth: 120,
       flex: 1.2,
-      renderHeader: () => <strong>Branch Name</strong>,
+      renderHeader: () => (
+        <span style={{ fontWeight: 700, color: "#fff" }}>Branch Name</span>
+      ),
       renderCell: (params) => {
-      
         const branchName = (params.value || "").toLowerCase();
-        // Find the FIRST matching remote whose name is contained anywhere in the branch name
         const foundRemote =
           remotes.find(remote => branchName.includes(remote)) || "default";
         const color = branchTypeColors[foundRemote] || branchTypeColors.default;
-          return (
+        return (
           <Box
             sx={{
               display: "flex",
@@ -1303,67 +1313,51 @@ const getDefaultStashMessage = (branchName) => {
                 flexShrink: 0,
               }}
             />
-            <Typography noWrap sx={{ fontWeight: 600, color: "#2563eb", userSelect: "text" }}>
+            <Typography
+              noWrap
+              sx={{
+                fontWeight: 500,
+                color: "#fff",           // <-- make white, not "#2563eb" or "#38bdf8"
+                userSelect: "text"
+              }}
+            >
               {params.value}
             </Typography>
           </Box>
         );
       },
     },
-    
     {
       field: "date",
       headerName: "Branch Creation Date",
-      minWidth: 230,
+      minWidth: 210,
       flex: 1,
       renderHeader: () => (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            pl: 1,
-            position: "sticky",
-          }}
-        >
-          <span style={{ fontWeight: 700 }}>Creation Date</span>
-        </Box>
+        <span style={{ fontWeight: 700, color: "#fff" }}>Creation Date</span>
       ),
       renderCell: (params) => (
-        <Box sx={{ pl: 1, position: "sticky" }}>
-          <span style={{ color: "#2d3748", fontWeight: 500 }}>
-            {params.value || "-"}
-          </span>
-        </Box>
+        <span style={{ color: "#e0e7ef", fontWeight: 500 }}>
+          {params.value || "-"}
+        </span>
       ),
     },
     {
       field: "createdFrom",
       headerName: "Created From",
-      minWidth: 230,
+      minWidth: 210,
       flex: 1,
       renderHeader: () => (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            pl: 1,
-            position: "sticky",
-          }}
-        >
-          <span style={{ fontWeight: 700 }}>Created From</span>
-        </Box>
+        <span style={{ fontWeight: 700, color: "#fff" }}>Created From</span>
       ),
       renderCell: (params) => (
-        <Box sx={{ pl: 1, position: "sticky" }}>
-          <span style={{ color: "#2d3748", fontWeight: 600 }}>
-            {params.value || "-"}
-          </span>
-        </Box>
+        <span style={{ color: "#e0e7ef", fontWeight: 600 }}>
+          {params.value || "-"}
+        </span>
       ),
     },
     {
       field: "actions",
-      headerName: "Actions", // MUST be a string!
+      headerName: "Actions",
       renderHeader: () => (
         <FloatingWhiteTooltip title="Use the actions menu to Checkout or Delete a branch.">
           <span
@@ -1371,6 +1365,7 @@ const getDefaultStashMessage = (branchName) => {
               display: "flex",
               alignItems: "center",
               fontWeight: 700,
+              color: "#fff"
             }}
           >
             Actions
@@ -1395,10 +1390,10 @@ const getDefaultStashMessage = (branchName) => {
         >
           <IconButton
             size="small"
-            onClick={(e) => handleOpenMenu(e, params.row.name)}
+            onClick={e => handleOpenMenu(e, params.row.name)}
             aria-label="actions"
           >
-            <MoreVertIcon />
+            <MoreVertIcon sx={{ color: "#fff" }} />
           </IconButton>
           {menuBranch === params.row.name && (
             <Menu
@@ -1460,6 +1455,7 @@ const getDefaultStashMessage = (branchName) => {
                 onClose={() => setCompareDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
+                
               >
                 <DialogTitle>Compare Branches</DialogTitle>
                 <DialogContent>
@@ -1859,7 +1855,11 @@ const getDefaultStashMessage = (branchName) => {
     },
   ];
 
+    //edd
+
   return (
+    <ThemeProvider theme={darkTheme}>
+
     <Container
       maxWidth={false}
       disableGutters
@@ -1878,89 +1878,121 @@ const getDefaultStashMessage = (branchName) => {
           mb: 2, // Margin below header (optional)
         }}
       ></Box>
-      <Paper
-        elevation={8}
-        sx={{
-          p: { xs: 2, md: 4 },
-          bgcolor: "#f9fafb",
-          borderRadius: 4,
-          boxShadow: "0 2px 18px 1px #e5e7eb",
-        }}
-      >
+    <Paper
+  variant="outlined"
+  sx={{
+    p: 1.5,
+    borderRadius: 3,
+    bgcolor: "#171928",                    // Keep your dark background
+    border: "2px solid #232642",           // Change: Dark subtle border (not blue!)
+    boxShadow: "none",                     // Remove all color glows!
+    minHeight: 50,
+  }}
+>
+
+
         {" "}
-        <Box
-          sx={{
+ <Box sx={{ width: '100%', mt: 4 }}>
+
+{/* Header Row: Logo + Title (side by side, top) */}
+<Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+  <CloudPulseLogo />
+  <Typography
+  variant="h4"
+  sx={{
+    fontWeight: 800,
+    ml: 1.5,
+    color: "#fff",               // Pure white title
+    whiteSpace: "nowrap",
+    letterSpacing: 1,
+  }}
+>
+  Git Dashboard
+</Typography>
+
+</Box>
+          <Box
+           sx={{
             display: "flex",
             alignItems: "center",
-            mb: 3,
-            borderBottom: "2.5px solid #0ea5e9",
-            pb: 2,
-            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+            background: "rgba(36, 39, 58, 0.88)", // like a soft panel look
+            borderRadius: 3,
+            px: 2.5,
+            py: 2,     // vertical padding for "table" button bar feel
+            mb: 4,     // margin to dashboard below
+            boxShadow: "0 4px 24px 0 #181e2680",
+            border: "1.5px solid #232642",
           }}
-        >
-          <Box
-            sx={{ display: "flex", alignItems: "center", position: "sticky" }}
           >
-            <CloudPulseLogo />
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 800,
-                ml: 1,
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Git Dashboard
-            </Typography>
-          </Box>
+    <AppButton
+  color="grey"
+  startIcon={<AddIcon />}
+  onClick={() => {
+    setCreateBranchDialogOpen(true);
+    setCreateBranchRemote("");
+    setCreateBranchTarget("");
+    setCreateBranchName("");
+  }}
+  disabled={isOpeningCreateDialog}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Slate grey gradient
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b",
+    },
+  }}
+>
+  Create
+</AppButton>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "nowrap",
-              overflowX: "auto",
-              mt: 2,
-              mb: 2,
-            }}
-          >
-            <AppButton
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setCreateBranchDialogOpen(true);
-                setCreateBranchRemote("");
-                setCreateBranchTarget("");
-                setCreateBranchName("");
-              }}
-              disabled={isOpeningCreateDialog}
-              sx={{ minWidth: 128 }}
-            >
-              Create
-            </AppButton>
 
-            <AppButton
-              startIcon={<SyncIcon />}
-              loading={isPulling}
-              onClick={handlePull}
-              disabled={isPulling}
-              sx={{ minWidth: 128 }}
-            >
-              Pull
-            </AppButton>
 
-   <AppButton
+<AppButton
+  color="grey"
+  startIcon={<SyncIcon />}
+  loading={isPulling}
+  onClick={handlePull}
+  disabled={isPulling}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Slate grey gradient
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b",
+    },
+  }}
+>
+  Pull
+</AppButton>
+
+
+<AppButton
+  color="grey"
   startIcon={<SettingsBackupRestoreIcon />}
   loading={isStashing}
   onClick={openStashDialog}
   disabled={isStashing}
-  sx={{ minWidth: 128 }}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Slate grey gradient
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b",
+    },
+  }}
 >
   Stash
 </AppButton>
+
 
 <Dialog open={stashDialogOpen} onClose={() => setStashDialogOpen(false)} maxWidth="xs" fullWidth>
   <DialogTitle>Stash Actions</DialogTitle>
@@ -1978,8 +2010,8 @@ const getDefaultStashMessage = (branchName) => {
       }}
       sx={{ mb: 2 }}
     >
-      <FormControlLabel value="stash" control={<Radio />} label="Stash" />
-      <FormControlLabel value="unstash" control={<Radio />} label="Unstash" />
+      <FormControlLabel value="stash" control={<Radio sx={{ color: "#fff", '&.Mui-checked': { color: "#0ea5e9" } }}/>} label="Stash" />
+      <FormControlLabel value="unstash" control={<Radio sx={{ color: "#fff", '&.Mui-checked': { color: "#0ea5e9" } }} />} label="Unstash" />
     </RadioGroup>
 
 
@@ -2175,342 +2207,491 @@ const getDefaultStashMessage = (branchName) => {
             >
               {/* Tooltip can directly wrap AppButton */}
               <span>
-                <AppButton
-                  startIcon={<CompareArrowsIcon />} // arrows for switch/swap
-                  onClick={handleOpenEnvSwitcher}
-                  sx={{ minWidth: 128 }}
-                >
-                  Switch
-                </AppButton>
+              <AppButton
+  color="grey"
+  startIcon={<CompareArrowsIcon />} // arrows for switch/swap
+  onClick={handleOpenEnvSwitcher}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Slate grey gradient
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)", // Deeper slate on hover
+      border: "2px solid #64748b",
+    },
+  }}
+>
+  Switch
+</AppButton>
+
               </span>
             </FloatingWhiteTooltip>
 
             <AppButton
-              startIcon={<PowerSettingsNewIcon />} // power/start symbol for start
-              onClick={handleStartService}
-              sx={{ minWidth: 128 }}
-            >
-              Start
-            </AppButton>
+  color="grey"
+  startIcon={<PowerSettingsNewIcon />} // power/start symbol for start
+  onClick={handleStartService}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Cool slate grey
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b"
+    },
+  }}
+>
+  Start
+</AppButton>
 
-            <AppButton
-              onClick={() => setAutomationDialogOpen(true)}
-              startIcon={<PlayCircleOutlineIcon />} // play symbol for run/test
-              sx={{ minWidth: 128 }}
-            >
-              Run Specs
-            </AppButton>
+<AppButton
+  color="grey"
+  onClick={() => setAutomationDialogOpen(true)}
+  startIcon={<PlayCircleOutlineIcon />} // play symbol for run/test
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Cool slate grey
+    color: "#fff",
+    boxShadow: "0 2px 8px #33415540",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b"
+    },
+  }}
+>
+  Run Specs
+</AppButton>
 
-            <AppButton
-              color="secondary"
-              startIcon={<CloudUploadIcon />} // upload/cloud for add remote
-              onClick={() => setAddRemoteDialogOpen(true)}
-              sx={{ minWidth: 128 }}
-            >
-              Add Remote
-            </AppButton>
 
-            <AppButton
-              color="secondary"
-              onClick={handleOpenRemoveRemote}
-              startIcon={<CloudOffIcon />}
-              sx={{
-                fontSize: 12,
-                fontWeight: 500,
-                borderRadius: 2,
-                px: 1.1,
-                py: 1.1,
-                minWidth: 0, // ensures autosize, not forced wide
-                textTransform: "none",
-                boxShadow: "0 2px 8px #0ea5e950",
-                background: "linear-gradient(90deg, #0ea5e9 90%, #38bdf8 110%)",
-                color: "#fff",
-                "&:hover": {
-                  background:
-                    "linear-gradient(90deg, #2563eb 80%, #38bdf8 100%)",
-                  border: "2px solid #0ea5e9",
-                  boxShadow: "0 4px 16px #0ea5e980",
-                },
-              }}
-            >
-              Remove Remote
-            </AppButton>
+
+<AppButton
+  color="grey"
+  startIcon={<CloudUploadIcon />} // upload/cloud for add remote
+  onClick={() => setAddRemoteDialogOpen(true)}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Nice dark to slightly lighter grey
+    color: "#fff",
+    boxShadow: "0 2px 8px #64748b66",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b"
+    },
+  }}
+>
+  Add Remote
+</AppButton>
+
+
+ <AppButton
+  color="grey"
+  onClick={handleOpenRemoveRemote}
+  startIcon={<CloudOffIcon />}
+  sx={{
+    minWidth: 128,
+    background: "linear-gradient(90deg, #334155 80%, #64748b 110%)", // Nice dark to slightly lighter grey
+    color: "#fff",
+    boxShadow: "0 2px 8px #64748b66",
+    "&:hover": {
+      background: "linear-gradient(90deg, #1e293b 80%, #334155 100%)",
+      border: "2px solid #64748b"
+    },
+  }}
+>
+  Remove Remote
+</AppButton>
+
           </Box>
 
           <Dialog
-            open={removeRemoteDialogOpen}
-            onClose={() => setRemoveRemoteDialogOpen(false)}
-            PaperProps={{
-              sx: {
-                borderRadius: 3,
-                minWidth: 400,
-                p: 1,
-                boxShadow: "0 8px 40px #00000030",
-                backgroundColor: "#fff",
-              },
-            }}
-          >
-            <DialogTitle
-              sx={{
-                fontWeight: 700,
-                textAlign: "center",
-                fontSize: 24,
-                pb: 0,
-                pt: 2,
-                letterSpacing: 0,
-              }}
-            >
-              Remove Remote
-            </DialogTitle>
-            <DialogContent
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                pt: 2,
-                pb: 0,
-              }}
-            >
-              <RadioGroup
-                value={selectedRemote}
-                onChange={(e) => setSelectedRemote(e.target.value)}
-                sx={{ width: "100%" }}
-              >
-                {remotes.map((remote) => (
-                  <FormControlLabel
-                    key={remote}
-                    value={remote}
-                    control={<Radio />}
-                    label={
-                      <Typography sx={{ fontSize: 18 }}>{remote}</Typography>
-                    }
-                    sx={{ my: 1 }}
-                  />
-                ))}
-              </RadioGroup>
-              {remotes.length === 0 && (
-                <Typography sx={{ fontSize: 18, color: "#888" }}>
-                  No remotes available
-                </Typography>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button
-                onClick={() => setRemoveRemoteDialogOpen(false)}
-                sx={{
-                  color: "#0ea5e9",
-                  fontWeight: 700,
-                  textTransform: "none",
-                  fontSize: 16,
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                disabled={!selectedRemote}
-                onClick={handleDeleteRemote}
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 16,
-                  textTransform: "none",
-                  borderRadius: 2,
-                  alignItems: "center",
-                  px: 3,
-                  py: 1,
-                }}
-              >
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Snackbar
-            open={snackbar.open}
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            autoHideDuration={3000}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-          >
-            <Alert
-              onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-              severity={snackbar.severity}
-              sx={{ width: "100%" }}
-            >
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
+  open={removeRemoteDialogOpen}
+  onClose={() => setRemoveRemoteDialogOpen(false)}
+  PaperProps={{
+    sx: {
+      borderRadius: 3,
+      minWidth: 400,
+      p: 1,
+      boxShadow: "0 8px 40px #6366f130", // subtle blue shadow for separation
+      backgroundColor: "#fff",            // WHITE
+      color: "#1e293b",                   // Slate/Dark text
+      border: "1.5px solid #e0e7ef",      // Subtle border
+    },
+  }}
+>
+  <DialogTitle
+    sx={{
+      color: "#1e293b",                   // dark header
+      fontWeight: 700,
+      textAlign: "center",
+      fontSize: 24,
+      pb: 0,
+      pt: 2,
+      letterSpacing: 0,
+      bgcolor: "#f8fafc",                 // very light gray for header
+      borderRadius: "8px 8px 0 0",
+      borderBottom: "1.5px solid #e5e7eb"
+    }}
+  >
+    Remove Remote
+  </DialogTitle>
 
-          <Dialog
-            open={addRemoteDialogOpen}
-            onClose={() => {
-              setAddRemoteDialogOpen(false);
-              setNewRemoteName("");
-              setNewRemoteUrl("");
-            }}
-          >
-            <DialogTitle>Add Git Remote</DialogTitle>
-            <DialogContent>
-              <TextField
-                label="Remote Name"
-                value={newRemoteName}
-                onChange={(e) => setNewRemoteName(e.target.value)}
-                fullWidth
-                margin="normal"
-                autoFocus
-                required
-              />
-              <TextField
-                label="Remote URL"
-                value={newRemoteUrl}
-                onChange={(e) => setNewRemoteUrl(e.target.value)}
-                fullWidth
-                margin="normal"
-                required
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => {
-                  setAddRemoteDialogOpen(false);
-                  setNewRemoteName("");
-                  setNewRemoteUrl("");
-                }}
-                color="secondary"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddRemote}
-                color="primary"
-                variant="contained"
-                disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
-              >
-                {isAddingRemote ? "Adding..." : "Create"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+  <DialogContent
+    sx={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      pt: 2,
+      pb: 0,
+      bgcolor: "#fff",
+    }}
+  >
+    <RadioGroup
+      value={selectedRemote}
+      onChange={(e) => setSelectedRemote(e.target.value)}
+      sx={{ width: "100%" }}
+    >
+      {remotes.map((remote) => (
+        <FormControlLabel
+          key={remote}
+          value={remote}
+          control={
+            <Radio
+              sx={{
+                color: "#2563eb",
+                '&.Mui-checked': { color: "#2563eb" }
+              }}
+            />
+          }
+          label={
+            <Typography sx={{ fontSize: 18, color: "#1e293b" }}>{remote}</Typography>
+          }
+          sx={{ my: 1 }}
+        />
+      ))}
+    </RadioGroup>
+    {remotes.length === 0 && (
+      <Typography sx={{ fontSize: 18, color: "#64748b" }}>
+        No remotes available
+      </Typography>
+    )}
+  </DialogContent>
+  <DialogActions sx={{ px: 3, pb: 2, bgcolor: "#fff" }}>
+    <Button
+      onClick={() => setRemoveRemoteDialogOpen(false)}
+      sx={{
+        color: "#2563eb",
+        fontWeight: 700,
+        borderRadius: 2,
+        textTransform: "none",
+        fontSize: 16,
+        border: "1.5px solid #38bdf8",
+        background: "#f0f9ff",
+        "&:hover": {
+          color: "#0ea5e9",
+          border: "1.5px solid #0ea5e9",
+          background: "#bae6fd",
+        },
+      }}
+      variant="outlined"
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="contained"
+      color="error"
+      disabled={!selectedRemote}
+      onClick={handleDeleteRemote}
+      sx={{
+        fontWeight: 700,
+        fontSize: 16,
+        textTransform: "none",
+        borderRadius: 2,
+        alignItems: "center",
+        px: 3,
+        py: 1,
+        background: "#dc2626",
+        "&:hover": { background: "#b91c1c" },
+      }}
+    >
+      Delete
+    </Button>
+  </DialogActions>
+</Dialog>
+
         </Box>
         <Dialog
-          open={automationDialogOpen}
-          onClose={() => setAutomationDialogOpen(false)}
-          maxWidth="sm"
-          fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: "#fcfeff",
-              borderRadius: 4,
-              border: "3px solid #38bdf8",
-              boxShadow: "0 8px 36px #94a3b840",
-              minWidth: { xs: "95vw", sm: 540 },
-              p: 1,
-            },
-          }}
-        >
-          <DialogTitle
-            sx={{
-              fontWeight: 800,
-              color: "#0ea5e9",
-              fontSize: 22,
-              letterSpacing: 1,
-              borderRadius: "14px 14px 0 0",
-              bgcolor: "#e0f2fe",
-              borderBottom: "2px solid #38bdf8",
-              display: "flex",
-              alignItems: "center",
+  open={automationDialogOpen}
+  onClose={() => setAutomationDialogOpen(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff", // white dialog
+      borderRadius: 4,
+      border: "1.5px solid #e0e7ef",
+      boxShadow: "0 8px 36px #94a3b840",
+      minWidth: { xs: "95vw", sm: 540 },
+      p: 1,
+    },
+  }}
+>
+  <DialogTitle
+    sx={{
+      fontWeight: 800,
+      color: "#1e293b",
+      fontSize: 22,
+      letterSpacing: 0,
+      borderRadius: "14px 14px 0 0",
+      bgcolor: "#f8fafc",
+      borderBottom: "2px solid #e5e7eb",
+      display: "flex",
+      alignItems: "center",
+    }}
+  >
+    Run Cypress Automation
+    <IconButton sx={{ ml: "auto", color: "#64748b" }} onClick={() => setAutomationDialogOpen(false)} aria-label="close">
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent sx={{ py: 2, bgcolor: "#fff", color: "#1e293b" }}>
+    {specLoading ? (
+      <Box textAlign="center" py={4}>
+        <CircularProgress />
+      </Box>
+    ) : specList.length === 0 ? (
+      <Typography>No specs found.</Typography>
+    ) : (
+      <>
+        <Box display="flex" alignItems="center" mb={2}>
+          <Checkbox
+            checked={selectAll}
+            indeterminate={checkedSpecs.length > 0 && checkedSpecs.length < specList.length}
+            onChange={(e) => {
+              setSelectAll(e.target.checked);
+              setCheckedSpecs(e.target.checked ? [...specList] : []);
             }}
-          >
-            Run Cypress Automation
-            <IconButton
-              sx={{ ml: "auto" }}
-              onClick={() => setAutomationDialogOpen(false)}
-              aria-label="close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent sx={{ py: 2 }}>
-            {specLoading ? (
-              <Box textAlign="center" py={4}>
-                <CircularProgress />
-              </Box>
-            ) : specList.length === 0 ? (
-              <Typography>No specs found.</Typography>
-            ) : (
-              <>
-                <Box display="flex" alignItems="center" mb={2}>
-                  <Checkbox
-                    checked={selectAll}
-                    indeterminate={
-                      checkedSpecs.length > 0 &&
-                      checkedSpecs.length < specList.length
-                    }
-                    onChange={(e) => {
-                      setSelectAll(e.target.checked);
-                      setCheckedSpecs(e.target.checked ? [...specList] : []);
-                    }}
-                  />
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    Select All
-                  </Typography>
-                </Box>
-                <Box sx={{ overflowY: "auto", pr: 2, position: "sticky" }}>
-                  {specList.map((spec) => (
-                    <Box key={spec} display="flex" alignItems="center" py={0.2}>
-                      <Checkbox
-                        checked={checkedSpecs.includes(spec)}
-                        onChange={() => {
-                          let newChecked;
-                          if (checkedSpecs.includes(spec)) {
-                            newChecked = checkedSpecs.filter((s) => s !== spec);
-                            setSelectAll(false);
-                          } else {
-                            newChecked = [...checkedSpecs, spec];
-                            if (newChecked.length === specList.length)
-                              setSelectAll(true);
-                          }
-                          setCheckedSpecs(newChecked);
-                        }}
-                      />
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "monospace",
-                          color: "#0ea5e9",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {spec.split("/").pop()}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </>
-            )}
-          </DialogContent>
-
-          <DialogActions
-            sx={{ borderTop: "1px solid #e0e7ef", bgcolor: "#f1f8ff" }}
-          >
-            <Button onClick={() => setAutomationDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={checkedSpecs.length === 0}
-              onClick={() => {
-                setAutomationDialogOpen(false);        // 1. Close the dialog immediately
-                handleRunSpecs(checkedSpecs);          // 2. Then run the specs
-              }}
- >
-              Run Selected{" "}
-              {checkedSpecs.length > 0 ? `(${checkedSpecs.length})` : ""}
-            </Button>
-          </DialogActions>
-        </Dialog>
-        {/* Create Branch Dialog */}
-        <Dialog
+          />
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            Select All
+          </Typography>
+        </Box>
+        <Box sx={{ overflowY: "auto", pr: 2, position: "sticky" }}>
+          {specList.map((spec) => (
+            <Box key={spec} display="flex" alignItems="center" py={0.2}>
+              <Checkbox
+                checked={checkedSpecs.includes(spec)}
+                onChange={() => {
+                  let newChecked;
+                  if (checkedSpecs.includes(spec)) {
+                    newChecked = checkedSpecs.filter((s) => s !== spec);
+                    setSelectAll(false);
+                  } else {
+                    newChecked = [...checkedSpecs, spec];
+                    if (newChecked.length === specList.length)
+                      setSelectAll(true);
+                  }
+                  setCheckedSpecs(newChecked);
+                }}
+              />
+              <Typography
+                variant="body2"
+                sx={{
+                  fontFamily: "monospace",
+                  color: "#1e293b",
+                  fontWeight: 600,
+                }}
+              >
+                {spec.split("/").pop()}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </>
+    )}
+  </DialogContent>
+  <DialogActions
+    sx={{ borderTop: "1px solid #e0e7ef", bgcolor: "#f8fafc" }}
+  >
+    <Button
+      onClick={() => setAutomationDialogOpen(false)}
+      variant="outlined"
+      sx={{
+        borderColor: "#d1d5db",
+        color: "#1e293b",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        background: "#fff",
+        textTransform: "none",
+        "&:hover": {
+          borderColor: "#1e293b",
+          background: "#f3f3f3",
+        },
+      }}
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="contained"
+      disabled={checkedSpecs.length === 0}
+      onClick={() => {
+        setAutomationDialogOpen(false);
+        handleRunSpecs(checkedSpecs);
+      }}
+      sx={{
+        bgcolor: "#1e293b",
+        color: "#fff",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        textTransform: "none",
+        boxShadow: "none",
+        "&:hover": {
+          bgcolor: "#111827",
+        },
+      }}
+    >
+      Run Selected {checkedSpecs.length > 0 ? `(${checkedSpecs.length})` : ""}
+    </Button>
+  </DialogActions>
+</Dialog>
+<Dialog
+  open={addRemoteDialogOpen}
+  onClose={() => {
+    setAddRemoteDialogOpen(false);
+    setNewRemoteName("");
+    setNewRemoteUrl("");
+  }}
+  maxWidth="xs"
+  fullWidth
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff",
+      borderRadius: 4,
+      border: "1.5px solid #e0e7ef",
+      boxShadow: "0 8px 36px #94a3b840",
+      minWidth: 400,
+    },
+  }}
+>
+  <DialogTitle
+    sx={{
+      fontWeight: 800,
+      color: "#1e293b",
+      fontSize: 22,
+      letterSpacing: 0,
+      borderRadius: "14px 14px 0 0",
+      bgcolor: "#f8fafc",
+      borderBottom: "2px solid #e5e7eb",
+      display: "flex",
+      alignItems: "center",
+    }}
+  >
+    Add Git Remote
+    <IconButton
+      sx={{ ml: "auto", color: "#64748b" }}
+      onClick={() => {
+        setAddRemoteDialogOpen(false);
+        setNewRemoteName("");
+        setNewRemoteUrl("");
+      }}
+      aria-label="close"
+    >
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent sx={{ bgcolor: "#fff", color: "#1e293b", pb: 1.5 }}>
+    <TextField
+      label="Remote Name"
+      value={newRemoteName}
+      onChange={(e) => setNewRemoteName(e.target.value)}
+      fullWidth
+      margin="normal"
+      autoFocus
+      required
+      sx={{
+        input: { color: "#1e293b" },
+        label: { color: "#1e293b" },
+        "& .MuiOutlinedInput-root": {
+          "& fieldset": { borderColor: "#e5e7eb" },
+          "&:hover fieldset": { borderColor: "#d1d5db" },
+          "&.Mui-focused fieldset": { borderColor: "#1e293b" },
+        },
+      }}
+      InputLabelProps={{ style: { color: "#1e293b" } }}
+    />
+    <TextField
+      label="Remote URL"
+      value={newRemoteUrl}
+      onChange={(e) => setNewRemoteUrl(e.target.value)}
+      fullWidth
+      margin="normal"
+      required
+      sx={{
+        input: { color: "#1e293b" },
+        label: { color: "#1e293b" },
+        "& .MuiOutlinedInput-root": {
+          "& fieldset": { borderColor: "#e5e7eb" },
+          "&:hover fieldset": { borderColor: "#d1d5db" },
+          "&.Mui-focused fieldset": { borderColor: "#1e293b" },
+        },
+      }}
+      InputLabelProps={{ style: { color: "#1e293b" } }}
+    />
+  </DialogContent>
+  <DialogActions sx={{ bgcolor: "#f8fafc" }}>
+    <Button
+      onClick={() => {
+        setAddRemoteDialogOpen(false);
+        setNewRemoteName("");
+        setNewRemoteUrl("");
+      }}
+      variant="outlined"
+      sx={{
+        borderColor: "#d1d5db",
+        color: "#1e293b",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        background: "#fff",
+        textTransform: "none",
+        "&:hover": {
+          borderColor: "#1e293b",
+          background: "#f3f3f3",
+        },
+      }}
+    >
+      Cancel
+    </Button>
+    <Button
+      onClick={handleAddRemote}
+      variant="contained"
+      disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
+      sx={{
+        background: "#1e293b",
+        color: "#fff",
+        fontWeight: 700,
+        fontSize: 16,
+        borderRadius: 2,
+        textTransform: "none",
+        px: 3,
+        py: 1,
+        "&:hover": { background: "#111827" },
+      }}
+      startIcon={isAddingRemote && <CircularProgress color="inherit" size={18} />}
+    >
+      {isAddingRemote ? "Adding..." : "Create"}
+    </Button>
+  </DialogActions>
+</Dialog>
+ {/* Create Branch Dialog */}
+ <Dialog
           open={createBranchDialogOpen}
           onClose={() => setCreateBranchDialogOpen(false)}
           maxWidth="xs"
@@ -2670,6 +2851,8 @@ const getDefaultStashMessage = (branchName) => {
             </Button>
           </DialogActions>
         </Dialog>
+
+
         {/* Force Pull Confirm Dialog */}
         <Dialog
           open={forcePullConfirmOpen}
@@ -2723,7 +2906,7 @@ const getDefaultStashMessage = (branchName) => {
     </IconButton>
   </DialogTitle>
 
-  <DialogContent dividers>
+  <DialogContent dividers sx={{ bgcolor: "#232642", color: "#e5e7eb" }}>
   <TextField
   label="Branch Name"
   fullWidth
@@ -2779,7 +2962,7 @@ const getDefaultStashMessage = (branchName) => {
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ bgcolor: "#232642", color: "#e5e7eb" }}>
             <Autocomplete
               options={ENV_OPTIONS}
               value={selectedEnv}
@@ -2815,42 +2998,30 @@ const getDefaultStashMessage = (branchName) => {
                 ) : null
               }
             >
-              {envLoading ? "Switching..." : "Confirm"}
+        {envLoading ? "Switching..." : "Confirm"}
             </Button>
           </DialogActions>
         </Dialog>
-        <Box>
-          {/* Your search bar component here (as before) */}
-       <Box
+      {/* 🔍 Search Box */}
+<Box
   sx={{
-    display: "flex",
-    alignItems: "center",
-    bgcolor: "#fff",
-    border: "2.5px solid #bae6fd",
-    boxShadow: "0 4px 24px 0 #0284c71b",
-    borderRadius: 2.5,
-    px: 2.4,
-    py: 1.25,
-    maxWidth: 475,
     width: "100%",
-    gap: 2,
-    transition: "border 0.25s, box-shadow 0.25s",
-    "&:focus-within": {
-      borderColor: "#0ea5e9",
-      boxShadow: "0 8px 18px #0ea5e930",
-    },
+    maxWidth: 1300,
+    mt: 3,
+    ml: 0,
+    mr: "auto",
+    bgcolor: "#171928",
+    borderRadius: 5,
+    boxShadow: "0 8px 40px #00000030",
+    p: 2,
   }}
 >
-  <SearchIcon sx={{ color: "#0ea5e9", mr: 1.6, fontSize: 27 }} />
   <Autocomplete
     freeSolo
-    fullWidth
     disablePortal
-    options={filteredSuggestions}
+    options={filteredSuggestions ?? []}
     inputValue={search}
-    PaperComponent={(props) => (
-      <SuggestionPaper {...props} branchCount={filteredSuggestions.length} />
-    )}
+    PaperComponent={SuggestionPaper}
     noOptionsText="No matching branches found"
     onInputChange={(event, newInputValue, reason) => {
       setSearch(newInputValue);
@@ -2862,126 +3033,96 @@ const getDefaultStashMessage = (branchName) => {
         setSearch(newValue);
       }
     }}
+    sx={{ flex: 1 }}
     renderInput={(params) => (
       <TextField
         {...params}
-        placeholder="Type to see suggestions, Press Enter to search"
-        variant="standard"
-        InputProps={{
-          ...params.InputProps,
-          disableUnderline: true,
-        }}
+        placeholder="Search branches..."
+        fullWidth
         sx={{
-          bgcolor: "transparent",
-          "& input": {
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#0ea5e9",
-            pl: 0.5,
-            letterSpacing: 0.05,
-            border: "none",
+          input: { fontSize: "1rem", py: 1.5 },
+          "& .MuiOutlinedInput-root": {
+            "& fieldset": { borderColor: "#fff" },
+            "&:hover fieldset": { borderColor: "#fff" },
+            "&.Mui-focused fieldset": { borderColor: "#fff" },
           },
-          width: "100%",
         }}
       />
     )}
     renderOption={(props, option, { selected }) => (
-      <Box
-        component="li"
-        {...props}
-        sx={{
-          px: 2,
-          py: 1,
-          fontSize: 16,
-          fontWeight: 600,
-          color: "#0284c7",
-          borderRadius: 2,
-          cursor: "pointer",
-          mb: 0.2,
-          background: selected ? "#e0f2fe" : "#fff",
-          "&:hover": {
-            background: "#bae6fd",
-            color: "#2563eb",
-          },
-          transition: "background 120ms",
-        }}
-      >
-        <span
-          style={{
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis",
-            overflow: "hidden",
-            width: "100%",
-            display: "block",
+      <React.Fragment key={option}>
+        <Box
+          component="li"
+          {...props}
+          sx={{
+            px: 2,
+            py: 1,
+            fontSize: 15,
+            fontWeight: 500,
+            color: "#e5e7eb",
+            borderRadius: 2,
+            background: selected ? "#232642" : "#171928",
+            "&:hover": { background: "#263041", color: "#fff" },
+            transition: "background 120ms",
           }}
         >
           {option}
-        </span>
-      </Box>
+        </Box>
+        {props["data-option-index"] < (filteredSuggestions?.length ?? 0) - 1 && (
+          <Divider variant="fullWidth" sx={{ ml: 2, mr: 2 }} />
+        )}
+      </React.Fragment>
     )}
   />
+
+  {/* ✅ Count below search */}
+  <Typography variant="body2" sx={{ mt: 1, color: "gray", pl: 0.5 }}>
+    {(filteredSuggestions ?? []).length} branches found
+  </Typography>
 </Box>
 
-          {/* Search bar ends here */}
+<Box
+  sx={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end", // 👈 moves content to right side
+    gap: 1, // space between label and branch name
+    mt: 2,
+  }}
+>
+  {/* Label */}
+  <Box
+    sx={{
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#fff", // white text for label
+    }}
+  >
+    Current Branch:
+  </Box>
 
-          {/* Print count below the search bar */}
-          <Typography
-            sx={{
-              color: branches.length === 0 ? "#94a3b8" : "#0ea5e9",
-              fontWeight: 400,
-              fontSize: 13.5,
-              ml: 1,
-              mt: 0.5,
-              mb: 0.3,
-              letterSpacing: 0.04,
-              userSelect: "none",
-            }}
-          >
-            {branches.length} {branches.length === 1 ? "branch" : "branches"}{" "}
-            shown
-          </Typography>
-          <Box
-          sx={{
-            mb: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            position: "sticky",
-          }}
-        >
-          <Typography
-            variant="subtitle1"
-            sx={{ fontWeight: 700, color: "#2563eb" }}
-          >
-            Current Branch:
-          </Typography>
-          <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
-            <span>
-              <Chip
-                label={currentBranch || "Loading..."}
-                color="primary"
-                variant="outlined"
-                size="small"
-                clickable
-                onClick={handleShowBranchLog}
-                sx={{
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  bgcolor: "#e0f2fe",
-                  color: "#0284c7",
-                  "&:hover": {
-                    bgcolor: "#bae6fd",
-                    boxShadow: "0 0 0 2px #0ea5e9",
-                  },
-                  maxWidth: 280,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              />
-            </span>
-          </FloatingWhiteTooltip>
-        </Box>
+  {/* Branch name */}
+  <FloatingWhiteTooltip title={currentBranch || "Loading..."}>
+    <Box
+      component="button"
+      onClick={handleShowBranchLog}
+      sx={{
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        background: "none",
+        border: "none",
+        outline: "none",
+        color: "#2563eb", // blue text for branch name
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "400px", // adjust as needed
+      }}
+    >
+      {currentBranch || "Loading..."}
+    </Box>
+  </FloatingWhiteTooltip>
 </Box>
 
          {/* Branch Table */}
@@ -2991,25 +3132,28 @@ const getDefaultStashMessage = (branchName) => {
           sx={{
             p: 2,
             borderRadius: 3,
-            bgcolor: "#f0f9ff",
+            bgcolor: "#171928",
             border: "2.5px solid #0ea5e9",
-            boxShadow: "0 4px 20px rgb(14 165 233 / 0.3)",
+            boxShadow: "none",
             mb: 3,
           }}
         >
 <Box sx={{ mt: 3, mb: 2 }}>
-  <Paper variant="outlined" sx={{
-    p: 1.5,
-    borderRadius: 3,
-    bgcolor: "#f0f9ff",
-    boxShadow: "0 2px 18px #bae6fd22",
-    minHeight: 50,
-  }}>
+  <Paper
+    variant="outlined"
+    sx={{
+      p: 1.5,
+      borderRadius: 3,
+      bgcolor: "#171928", // Dashboard dark
+      border: "2px solid #232642", // Blue border highlight
+      boxShadow: "none", // Soft blue shadow
+      minHeight: 50,
+    }}
+  >
     <Box sx={{ display: "flex", alignItems: "center" }}>
-    <Typography sx={{ fontWeight: 700, fontSize: 17, mr: 1, color: '#0ea5e9' }}>
-      Cypress Output
-    </Typography>
-
+    <Typography sx={{ fontWeight: 700, fontSize: 17, mr: 1, color: '#fff' }}>
+     Cypress Output
+     </Typography>
       <Tooltip title={outputOpen ? "Minimize" : "Maximize"}>
         <IconButton size="small" onClick={() => setOutputOpen(o => !o)}>
           {outputOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -3024,40 +3168,55 @@ const getDefaultStashMessage = (branchName) => {
             setSnackbar({ open: true, message: "Output copied to clipboard!", severity: "success" });
           }}
         >
-          <ContentCopyIcon />
+         <ContentCopyIcon sx={{ color: "#fff" }} />
+
         </IconButton>
       </Tooltip>
     </Box>
     <Collapse in={outputOpen}>
-    <Box
-  sx={{
-    bgcolor: "#171717",   // Black background (tailwind neutral-900)
-    color: "#fff",        // White text
-    borderRadius: 2,
-    p: 2,
-    whiteSpace: "pre-wrap",
-    fontFamily: "monospace",
-    fontSize: 14,
-    minHeight: 120,
-    overflowY: "auto",
-  }}
->
-  {isRunning 
-    ? "Running specs..."
-    : runOutput || runError || "No Cypress output yet."
-  }
-</Box>
-
+      <Box
+        sx={{
+          bgcolor: "#10121a",        // Very dark background
+          color: "#e0e7ef",          // Light gray text
+          borderRadius: 2,
+          p: 2,
+          whiteSpace: "pre-wrap",
+          fontFamily: "monospace",
+          fontSize: 14,
+          minHeight: 120,
+          overflowY: "auto",
+          mt: 1,
+        }}
+      >
+        {isRunning
+          ? "Running specs..."
+          : runOutput || runError || "No Cypress output yet."
+        }
+      </Box>
     </Collapse>
   </Paper>
 </Box>
 
-          <Box sx={{ overflowX: "auto", position: "sticky" }}>
-            <DataGrid
+
+<Box
+   sx={{
+    bgcolor: "#171928",
+    border: "2px solid #232642",
+    borderRadius: "14px",
+    boxShadow: "none",
+    p: 0,
+    mt: 2,
+    maxWidth: '850', // Fixed max width
+    width: '100%',
+    mx: 'auto',
+    overflow: 'hidden',
+  }}
+>
+
+              <DataGrid
               autoHeight
               rows={branches}
               columns={columns}
-              checkboxSelection
               pageSize={2}
               pagination
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
@@ -3071,20 +3230,20 @@ const getDefaultStashMessage = (branchName) => {
               getRowId={(row) => row.id}
               // checkboxSelection
               sx={{
-                fontSize: 16,
-                bgcolor: "#f0f9ff",
-                borderRadius: 2,
-                border: "none",
-                "& .MuiDataGrid-row:hover": { bgcolor: "#d7f0fe" },
-                "& .MuiDataGrid-checkboxInput": { color: "#0ea5e9" },
-                "& .MuiDataGrid-cell": { fontWeight: 400 },
-                "& .MuiDataGrid-columnHeaders": {
-                  bgcolor: "#e0f2fe",
-                  borderBottom: "2.5px solid #0ea5e9",
-                  fontWeight: 700,
-                  fontSize: 17,
+                border: '3px solid #64748b',      // medium grey border
+                borderRadius: '14px',
+                '& .MuiDataGrid-columnHeaders': {
+                  borderBottom: '2px solid #64748b',  // grey header bottom border
+                },
+                '& .MuiDataGrid-footerContainer': {
+                  borderTop: '2px solid #64748b',     // grey footer top border
+                },
+                '&.Mui-focused, &.Mui-focusVisible': {
+                  outline: 'none',
+                  borderColor: '#64748b',              // grey focus border color
                 },
               }}
+              
               components={{
                 LoadingOverlay,
                 NoRowsOverlay: () => (
@@ -3104,7 +3263,8 @@ const getDefaultStashMessage = (branchName) => {
             maxWidth="md"
             PaperProps={{
               sx: {
-                bgcolor: "#fcfeff",
+                bgcolor: "#232642", 
+                color: "#e5e7eb",
                 borderRadius: 4,
                 p: 2,
                 minWidth: { xs: "95vw", sm: 540 },
@@ -3114,7 +3274,7 @@ const getDefaultStashMessage = (branchName) => {
             <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
               Commit History ─ {currentBranch}
             </DialogTitle>
-            <DialogContent sx={{ maxHeight: 500, overflowY: "auto" }}>
+            <DialogContent sx={{ maxHeight: 500, overflowY: "auto", bgcolor: "#232642", color: "#e5e7eb" }}>
               {branchLogLoading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
                   <CircularProgress />
@@ -3252,289 +3412,117 @@ const getDefaultStashMessage = (branchName) => {
           </Dialog>
         </Paper>
         {/* Confirm Delete Selected Snackbar */}
-        {/* Confirm Delete Selected Dialog */}
-        <Dialog
-          open={confirmDelete.open}
-          onClose={() => setConfirmDelete({ open: false, branchName: "" })}
-          aria-labelledby="delete-branch-dialog-title"
-          maxWidth="xs"
-          fullWidth
-          slotProps={{
-            paper: {
-              sx: {
-                borderRadius: 4,
-                bgcolor: "#fff",
-                p: 0,
-                overflow: "visible",
-                minWidth: "fit-content",
-                maxWidth: 300,
-              },
-            },
-          }}
-        >
-          <DialogTitle
-            id="delete-branch-dialog-title"
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              bgcolor: "#e0f2fe", // light blue header
-              color: "#1674d3",
-              borderRadius: "4px 4px 0 0",
-              borderBottom: "1.5px solid #38bdf8",
-              fontWeight: 700,
-              fontSize: 22,
-              pb: 1,
-              pt: 2,
-            }}
-          >
-            <WarningAmberRoundedIcon sx={{ color: "#38bdf8", mr: 1 }} />
-            Confirm Deletion
-          </DialogTitle>
-          <DialogContent sx={{ py: 2.5, px: 3 }}>
-            <Typography variant="body1" sx={{ fontSize: 18, color: "#164e63" }}>
-              Are you sure you want to delete branch{" "}
-              <span style={{ color: "#dc2626", fontWeight: 700 }}>
-                {confirmDelete.branchName}
-              </span>
-              ?
-            </Typography>
-          </DialogContent>
-          <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 0 }}>
-            <Button
-              color="error"
-              variant="contained"
-              sx={{
-                minWidth: 110,
-                fontWeight: 700,
-                borderRadius: 2,
-                fontSize: 18,
-                px: 3,
-                py: 1.2,
-                boxShadow: "0 2px 8px #38bdf84a",
-              }}
-              onClick={handleConfirmDelete}
-              disabled={deletingBranches.has(confirmDelete.branchName)}
-              startIcon={
-                deletingBranches.has(confirmDelete.branchName) ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : (
-                  <DeleteIcon />
-                )
-              }
-            >
-              {deletingBranches.has(confirmDelete.branchName)
-                ? "Deleting..."
-                : "DELETE"}
-            </Button>
-            <Button
-              color="info"
-              variant="outlined"
-              sx={{
-                minWidth: 110,
-                fontWeight: 700,
-                borderRadius: 2,
-                fontSize: 18,
-                ml: 2,
-                px: 3,
-                py: 1.2,
-                color: "#1674d3",
-                borderColor: "#38bdf8",
-                background: "#e0f2fe",
-                "&:hover": {
-                  borderColor: "#2563eb",
-                  color: "#2563eb",
-                  background: "#bae6fd",
-                },
-              }}
-              onClick={() => setConfirmDelete({ open: false, branchName: "" })}
-              disabled={deletingBranches.has(confirmDelete.branchName)}
-            >
-              CANCEL
-            </Button>
-          </DialogActions>
-        </Dialog>
-        {/* General Snackbar */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert
-            severity={snackbar.severity}
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            sx={{ width: "100%" }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-        {/* TS File Stats Dialog */}
-        <Dialog
-          open={statsOpen}
-          onClose={() => setStatsOpen(false)}
-          maxWidth="sm"
-          PaperProps={{
-            sx: {
-              bgcolor: "#ffffff",
-              borderRadius: 4,
-              borderLeft: "8px solid #0ea5e9",
-              boxShadow: "0 8px 32px #dbeafe80",
-              minWidth: { xs: "95vw", sm: "540px" },
-              p: 1,
-            },
-          }}
-        >
-          <DialogTitle
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              pb: 0.5,
-              bgcolor: "#f0f9ff",
-              borderRadius: "10px 10px 0 0",
-              fontWeight: 800,
-              color: "#0ea5e9",
-            }}
-          >
-            <GitHubIcon sx={{ color: "#0ea5e9" }} />
-            .ts File Change Stats — <span>{statsBranch}</span>
-            <IconButton
-              onClick={() => setStatsOpen(false)}
-              sx={{ ml: "auto" }}
-              aria-label="Close"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <Divider />
-          <DialogContent sx={{ py: 2 }}>
-            {statsLoading && (
-              <Box sx={{ textAlign: "center", my: 3, position: "sticky" }}>
-                <CircularProgress
-                  thickness={5}
-                  size={44}
-                  sx={{ color: "#0ea5e9" }}
-                />
-              </Box>
-            )}
-            {!statsLoading && statsError && (
-              <Typography
-                color="error"
-                sx={{ mt: 3, mb: 3, fontSize: 22, textAlign: "center" }}
-              >
-                {statsError}
-              </Typography>
-            )}
-            {!statsLoading &&
-              !statsError &&
-              Array.isArray(statsData) &&
-              statsData.length > 0 && (
-                <Box sx={{ mt: 2, mb: 1, position: "sticky" }}>
-                  <Paper
-                    elevation={2}
-                    sx={{ borderRadius: 3, p: 2, bgcolor: "#f3f7fa" }}
-                  >
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "separate",
-                        borderSpacing: "0 8px",
-                        fontSize: 16,
-                      }}
-                    >
-                      <thead>
-                        <tr style={{ fontWeight: 700, color: "#0ea5e9" }}>
-                          <th style={{ textAlign: "left", padding: 8 }}>
-                            File
-                          </th>
-                          <th style={{ padding: 8 }}>+ Added</th>
-                          <th style={{ padding: 8 }}>– Deleted</th>
-                          <th style={{ padding: 8 }}>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {statsData.map((row) => (
-                          <tr key={row.file} style={{ background: "#fff" }}>
-                            <td
-                              style={{
-                                padding: 8,
-                                fontFamily: "monospace",
-                                fontSize: 15,
-                                fontWeight: 600,
-                                wordBreak: "break-all",
-                              }}
-                            >
-                              {row.file}
-                            </td>
-                            <td style={{ padding: 8 }}>
-                              <Chip
-                                label={`+${row.added}`}
-                                sx={{
-                                  bgcolor: "#e0fce4",
-                                  color: "#16a34a",
-                                  fontWeight: 700,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: 8 }}>
-                              <Chip
-                                label={`–${row.deleted}`}
-                                sx={{
-                                  bgcolor: "#fee2e2",
-                                  color: "#dc2626",
-                                  fontWeight: 700,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: 8 }}>
-                              <Chip
-                                label={
-                                  row.net > 0
-                                    ? `+${row.net}`
-                                    : row.net < 0
-                                      ? `${row.net}`
-                                      : "0"
-                                }
-                                sx={{
-                                  bgcolor:
-                                    row.net > 0
-                                      ? "#e0fce4"
-                                      : row.net < 0
-                                        ? "#fee2e2"
-                                        : "#e5e7eb",
-                                  color:
-                                    row.net > 0
-                                      ? "#16a34a"
-                                      : row.net < 0
-                                        ? "#dc2626"
-                                        : "#171717",
-                                  fontWeight: 700,
-                                }}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Paper>
-                </Box>
-              )}
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2, justifyContent: "center" }}>
-            <Button
-              onClick={() => setStatsOpen(false)}
-              color="primary"
-              variant="outlined"
-              startIcon={<CloseIcon />}
-              sx={{ borderRadius: 2, fontWeight: 700, minWidth: 90 }}
-            >
-              Close
-            </Button>
-          </DialogActions>
-        </Dialog>
+      {/* Confirm Delete Selected Dialog */}
+<Dialog
+  open={confirmDelete.open}
+  onClose={() => setConfirmDelete({ open: false, branchName: "" })}
+  aria-labelledby="delete-branch-dialog-title"
+  maxWidth="xs"
+  fullWidth
+  slotProps={{
+    paper: {
+      sx: {
+        borderRadius: 4,
+        bgcolor: "#f8fafc", // light grey/white background
+        color: "#1e293b", // dark grey text
+        p: 0,
+        overflow: "visible",
+        minWidth: "fit-content",
+        maxWidth: 300,
+        border: "2px solid #e2e8f0", // light grey border
+      },
+    },
+  }}
+>
+  <DialogTitle
+    id="delete-branch-dialog-title"
+    sx={{
+      display: "flex",
+      alignItems: "center",
+      gap: 1,
+      bgcolor: "#e2e8f0", // medium grey header
+      color: "#1e293b", // dark slate text
+      borderRadius: "4px 4px 0 0",
+      borderBottom: "1.5px solid #64748b", // grey border to match your table
+      fontWeight: 700,
+      fontSize: 22,
+      pb: 1,
+      pt: 2,
+    }}
+  >
+    <WarningAmberRoundedIcon sx={{ color: "#f59e0b", mr: 1 }} /> {/* amber warning color */}
+    Confirm Deletion
+  </DialogTitle>
+  <DialogContent sx={{ py: 2.5, px: 3, bgcolor: "#f8fafc", color: "#374151" }}>
+    <Typography variant="body1" sx={{ fontSize: 18, color: "#4b5563" }}>
+      Are you sure you want to delete branch{" "}
+      <span style={{ color: "#dc2626", fontWeight: 700 }}>
+        {confirmDelete.branchName}
+      </span>
+      ?
+    </Typography>
+  </DialogContent>
+  <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 0, bgcolor: "#f8fafc" }}>
+    <Button
+      color="error"
+      variant="contained"
+      sx={{
+        minWidth: 110,
+        fontWeight: 700,
+        borderRadius: 2,
+        fontSize: 18,
+        px: 3,
+        py: 1.2,
+        boxShadow: "none",
+        bgcolor: "#dc2626", // red for delete
+        "&:hover": {
+          bgcolor: "#b91c1c",
+        },
+      }}
+      onClick={handleConfirmDelete}
+      disabled={deletingBranches.has(confirmDelete.branchName)}
+      startIcon={
+        deletingBranches.has(confirmDelete.branchName) ? (
+          <CircularProgress size={18} color="inherit" />
+        ) : (
+          <DeleteIcon />
+        )
+      }
+    >
+      {deletingBranches.has(confirmDelete.branchName)
+        ? "Deleting..."
+        : "DELETE"}
+    </Button>
+    <Button
+      variant="outlined"
+      sx={{
+        minWidth: 110,
+        fontWeight: 700,
+        borderRadius: 2,
+        fontSize: 18,
+        ml: 2,
+        px: 3,
+        py: 1.2,
+        color: "#374151", // dark grey text
+        borderColor: "#64748b", // grey border
+        background: "#f1f5f9", // light grey background
+        "&:hover": {
+          borderColor: "#475569",
+          color: "#1e293b",
+          background: "#e2e8f0",
+        },
+      }}
+      onClick={() => setConfirmDelete({ open: false, branchName: "" })}
+      disabled={deletingBranches.has(confirmDelete.branchName)}
+    >
+      CANCEL
+    </Button>
+  </DialogActions>
+</Dialog>
+
       </Paper>
     </Container>
+    </ThemeProvider>
   );
 }
 
