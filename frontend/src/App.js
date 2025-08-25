@@ -211,7 +211,7 @@ function App() {
   // Effect to open dialog after menu closes and pending branch is set
   React.useEffect(() => {
     if (!menuAnchorEl && pendingCompareBranch) {
-      setSnackbar((prev) => ({ ...prev, open: false })); // close snackbar!
+      setSnackbar((prev) => ({ ...prev, open: false }));
       setBaseBranch(pendingCompareBranch);
       setCompareBranch("");
       setCompareDialogOpen(true);
@@ -220,6 +220,7 @@ function App() {
       setPendingCompareBranch(null);
     }
   }, [menuAnchorEl, pendingCompareBranch]);
+  
 
   // Delete confirmations
   const [confirmDelete, setConfirmDelete] = useState({
@@ -340,12 +341,23 @@ function App() {
     setMenuAnchorEl(event.currentTarget);
     setMenuBranch(branchName);
   };
-
+  
   const handleCloseMenu = () => {
     setMenuAnchorEl(null);
     setMenuBranch(null);
   };
-
+  const handleCompareSelection = (branchName) => {
+    setBaseBranch(branchName);
+    setCompareDialogOpen(true);
+    setPendingCompareBranch(null);
+  };
+  
+  // Explicit dialog close handler:
+  const handleDialogClose = () => {
+    setCompareDialogOpen(false);
+    setPendingCompareBranch(null);
+  };
+  
   const handleOpenRemoveRemote = async () => {
     try {
       const res = await fetch(`${API_URL}/remotes`);
@@ -1351,82 +1363,96 @@ function App() {
       minWidth: 120,
       flex: 0.9,
       renderHeader: () => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, height: 1 }}>
           <img
             src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/jira.svg"
-            style={{ width: 19, height: 19, filter: "brightness(2)" }}
             alt="Jira"
+            style={{ width: 19, height: 19, display: "block", verticalAlign: "middle", filter: "brightness(2)" }}
           />
-          <span style={{ fontWeight: 700, color: "#fff" }}>BugTicket</span>
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: 700, color: "#fff", lineHeight: 1 }}
+          >
+          Bug Ticket
+          </Typography>
         </Box>
       ),
-      renderCell: (params) =>
-        params.value && params.value.startsWith("DI-") ? (
-          <FloatingWhiteTooltip
-            title="Tracking the requirements using the linked JIRA ticket."
-            arrow
-            componentsProps={{ tooltip: { sx: { marginBottom: "6px" } } }}
-          >
+      
+      renderCell: (params) => (
+        <Box sx={{ display: "flex", alignItems: "center", height: 1, pl: 0.5 }}>
+          {params.value && params.value.startsWith("DI-") ? (
+            <FloatingWhiteTooltip
+              title="Tracking the requirements using the linked JIRA ticket."
+              arrow
+              componentsProps={{ tooltip: { sx: { marginBottom: "6px" } } }}
+            >
+              <Chip
+                label={params.value}
+                component="a"
+                href={`https://track.akamai.com/jira/browse/${params.value}`}
+                target="_blank"
+                clickable
+                sx={{
+                  maxWidth: 150,
+                  minWidth: 68,
+                  height: 32,
+                  fontWeight: 500,
+                  fontSize: 15,
+                  color: "#fff",
+                  border: "2px solid #fff",
+                  bgcolor: "#232642",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 8px #38bdf821",
+                  px: 2,
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  transition: "all .14s",
+                  "&:hover": {
+                    bgcolor: "#0ea5e9",
+                    color: "#fff",
+                    borderColor: "#38bdf8",
+                    boxShadow: "0 4px 16px #38bdf84a",
+                  },
+                  "& .MuiChip-label": {
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    px: 0,
+                    lineHeight: "32px", // Force Chip label vertical center
+                  },
+                }}
+              />
+            </FloatingWhiteTooltip>
+          ) : (
             <Chip
-              label={params.value}
-              component="a"
-              href={`https://track.akamai.com/jira/browse/${params.value}`}
-              target="_blank"
-              clickable
+              label="No ticket"
               sx={{
-                maxWidth: 170,
+                maxWidth: 120,
                 minWidth: 68,
-                height: 36,
-                fontWeight: 500,
+                height: 32,
+                fontWeight: 600,
                 fontSize: 15,
-                color: "#fff", // <-- make text white
-                border: "2px solid #fff", // <-- make border white
-                bgcolor: "#232642", // stays dark
-                borderRadius: "18px",
-                boxShadow: "0 2px 8px #38bdf821",
+                color: "#64748b",
+                bgcolor: "#232642",
+                border: "2px dashed #334155",
+                borderRadius: "16px",
+                boxShadow: "0 2px 8px #23264233",
                 px: 2,
                 textOverflow: "ellipsis",
                 overflow: "hidden",
                 whiteSpace: "nowrap",
-                cursor: "pointer",
-                transition: "all .14s",
-                "&:hover": {
-                  bgcolor: "#0ea5e9",
-                  color: "#fff",
-                  borderColor: "#38bdf8",
-                  boxShadow: "0 4px 16px #38bdf84a",
-                },
                 "& .MuiChip-label": {
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  lineHeight: "32px",
                   px: 0,
-                },
+                }
               }}
             />
-          </FloatingWhiteTooltip>
-        ) : (
-          <Chip
-            label="No ticket"
-            sx={{
-              maxWidth: 120,
-              minWidth: 68,
-              height: 36,
-              fontWeight: 600,
-              fontSize: 15,
-              color: "#64748b", // faded blue
-              bgcolor: "#232642", // blend with table
-              border: "2px dashed #334155",
-              borderRadius: "18px",
-              boxShadow: "0 2px 8px #23264233",
-              px: 2,
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-            }}
-          />
-        ),
+          )}
+        </Box>
+      ),
     },
+    
     {
       field: "name",
       headerName: "Branch Name",
@@ -1646,8 +1672,8 @@ function App() {
               </MenuItem>
 
               <Dialog
-                open={compareDialogOpen}
-                onClose={() => setCompareDialogOpen(false)}
+              open={compareDialogOpen}
+              onClose={() => setCompareDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
