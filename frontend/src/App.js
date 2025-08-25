@@ -1366,7 +1366,7 @@ const getDefaultStashMessage = (branchName) => {
         <span style={{ fontWeight: 700, color: "#fff" }}>Created From</span>
       ),
       renderCell: (params) => (
-        <span style={{ color: "#e0e7ef", fontWeight: 500 }}>
+        <span style={{ color: "#e0e7ef", fontWeight: 600 }}>
           {params.value || "-"}
         </span>
       ),
@@ -2512,8 +2512,6 @@ PaperProps={{
   Run Specs
 </AppButton>
 
-
-
 <AppButton
   color="grey"
   startIcon={<CloudUploadIcon />} // upload/cloud for add remote
@@ -2531,8 +2529,6 @@ PaperProps={{
 >
   Add Remote
 </AppButton>
-
-
  <AppButton
   color="grey"
   onClick={handleOpenRemoveRemote}
@@ -4072,7 +4068,7 @@ PaperProps={{
             }}
           >
             <GitHubIcon sx={{ color: "#0ea5e9" }} />
-            .ts File Change Stats — <span>{statsBranch}</span>
+              <span>{statsBranch}</span>
             <IconButton
               onClick={() => setStatsOpen(false)}
               sx={{ ml: "auto" }}
@@ -4202,18 +4198,7 @@ PaperProps={{
               color="primary"
               variant="outlined"
               startIcon={<CloseIcon />}
-              sx={{
-                borderRadius: 2,
-                fontWeight: 700,
-                minWidth: 90,
-                color: "black",           // <-- add this line
-                borderColor: "black",     // optional: makes the outline also black
-                '&:hover': {
-                  color: "black",         // ensures text stays black on hover
-                  borderColor: "black",   // ensures border stays black on hover
-                  backgroundColor: "#f3f4f6", // light gray on hover, optional
-                }
-              }}
+              sx={{ borderRadius: 2, fontWeight: 700, minWidth: 90 }}
             >
               Close
             </Button>
