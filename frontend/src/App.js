@@ -3466,14 +3466,14 @@ function App() {
             }}
           >
             {/* Show a loading bar at top when in progress */}
-            {isCheckingOut && <LinearProgress color="primary" />}
+            {isCheckingOut && <LinearProgress color="black" />}
 
             <DialogTitle
               sx={{
                 display: "flex",
                 alignItems: "center",
-                color: "#0284c7",
-                fontWeight: 700,
+                color: "black",
+                fontWeight: 'bold',
               }}
             >
               Checkout Branch
@@ -3518,51 +3518,57 @@ function App() {
               </Box>
             </DialogContent>
             <DialogActions sx={{ bgcolor: "#fff" }}>
-              <Button
-                onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
-                disabled={isCheckingOut}
-                variant="outlined"
-                sx={{
-                  color: "#111",
-                  borderColor: "#111",
-                  bgcolor: "#fff",
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  minWidth: 120,
-                  "&:hover": {
-                    bgcolor: "#f3f4f6",
-                    borderColor: "#111",
-                    color: "#111",
-                  },
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!checkoutBranchName.trim() || isCheckingOut}
-                onClick={handleCheckoutBranch}
-                startIcon={
-                  isCheckingOut ? (
-                    <CircularProgress color="inherit" size={18} />
-                  ) : null
-                }
-                sx={{
-                  color: "#111",
-                  borderColor: "#111",
-                  bgcolor: "#fff",
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  minWidth: 120,
-                  "&:hover": {
-                    bgcolor: "#f3f4f6",
-                    borderColor: "#111",
-                    color: "#111",
-                  },
-                }}
-              >
-                {isCheckingOut ? "Checking out..." : "Checkout"}
-              </Button>
+            <Button
+  onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
+  disabled={isCheckingOut}
+  variant="outlined"
+  sx={{
+    color: "#111",
+    borderColor: "#111",
+    bgcolor: "#fff",
+    fontWeight: 700,
+    borderRadius: 2,
+    minWidth: 120,
+    transform: "none",
+    textTransform: "none",      // <-- Add this line
+    "&:hover": {
+      bgcolor: "#f3f4f6",
+      borderColor: "#111",
+      color: "#111",
+    },
+  }}
+>
+  Cancel
+</Button>
+
+<Button
+  variant="outlined"
+  disabled={!checkoutBranchName.trim() || isCheckingOut}
+  onClick={handleCheckoutBranch}
+  startIcon={
+    isCheckingOut ? (
+      <CircularProgress color="inherit" size={18} />
+    ) : null
+  }
+  sx={{
+    color: "#111",
+    borderColor: "#111",
+    bgcolor: "#fff",
+    fontWeight: 700,
+    borderRadius: 2,
+    transform: "none",
+    minWidth: 120,
+    textTransform: "none", // <-- Add this line
+    "&:hover": {
+      bgcolor: "#f3f4f6",
+      borderColor: "#111",
+      color: "#111",
+    },
+  }}
+>
+  {isCheckingOut ? "Checking out..." : "Checkout"}
+</Button>
+
             </DialogActions>
           </Dialog>
           <Dialog
