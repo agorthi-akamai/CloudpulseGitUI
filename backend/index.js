@@ -734,6 +734,48 @@ app.post('/pull-and-pnpm', async (req, res) => {
 });
 
 /** /run-automation - start cypress via Terminal (macOS) */
+app.post('/run-automation-temp', async (req, res) => {
+  try {
+    const specs = Array.isArray(req.body.specPaths)
+      ? req.body.specPaths
+      : (typeof req.body.specPath === 'string' ? [req.body.specPath] : []);
+    if (!specs.length) {
+      return res.status(400).json({ success: false, error: "No spec filename(s) provided." });
+    }
+    const browser = req.body.browser && req.body.browser.trim() !== '' ? req.body.browser.trim() : null;
+    const headed = Boolean(req.body.headed);
+
+    let cliOptions = '';
+    if (browser) {
+      cliOptions += ` --browser ${shellEscapeArg(browser)} --headed`;
+    }
+
+    const joinedSpecs = specs.join(',');
+    const cdDir = repoPath; // use configured repoPath
+    const cyCommand = `cd ${shellEscapeArg(cdDir)} && pnpm cy:run -s ${shellEscapeArg(joinedSpecs)}`;
+
+    // Spawn the process and capture its entire output
+    exec(cyCommand, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          error: stderr || error.message,
+          output: stdout   // include what output was produced
+        });
+      }
+      res.json({
+        success: true,
+        message: 'Cypress test(s) finished.',
+        output: stdout,
+        error: stderr,
+        filesRun: specs
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to launch automation' });
+  }
+});
+
 app.post('/run-automation', async (req, res) => {
   try {
     const specs = Array.isArray(req.body.specPaths)
@@ -742,11 +784,28 @@ app.post('/run-automation', async (req, res) => {
     if (!specs.length) {
       return res.status(400).json({ success: false, error: "No spec filename(s) provided." });
     }
+const browser = req.body.browser && req.body.browser.trim() !== '' ? req.body.browser.trim() : null;
+const headed = Boolean(req.body.headed);
 
-    const joinedSpecs = specs.join(',');
-    const cdDir = repoPath; // use configured repoPath
-    const cyCommand = `cd ${shellEscapeArg(cdDir)} && pnpm cy:run -s ${shellEscapeArg(joinedSpecs)}`;
+const joinedSpecs = specs.join(',');
+const cdDir = repoPath; // use configured repoPath
 
+let cliOptions = '';
+if (browser) {
+  cliOptions += ` --browser ${shellEscapeArg(browser)}`;
+  if (headed) {
+    cliOptions += ' --headed';
+  }
+} else if (headed) {
+  // headed true but no browser specified
+  cliOptions += ' --headed';
+}
+
+const cyCommand = `cd ${shellEscapeArg(cdDir)} && pnpm cy:run -s ${shellEscapeArg(joinedSpecs)}${cliOptions}`;
+
+    
+   console.log('Cypress command:', cyCommand);
+   
     // Spawn the process and capture its entire output
     exec(cyCommand, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
       if (error) {

@@ -30,6 +30,7 @@ import {
   Collapse,
   InputAdornment,
   ListItemIcon,
+  Select
 } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
 import RadioGroup from "@mui/material/RadioGroup";
@@ -286,8 +287,12 @@ function App() {
   const [isOpeningCreateDialog, setIsOpeningCreateDialog] = useState(false);
   const [showChangeset, setShowChangeset] = useState(false);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [browser, setBrowser] = React.useState(""); // or default "chrome"
+  const [headed, setHeaded] = React.useState(false);
   const [page, setPage] = useState(1);
   const specsPerPage = 10; // You can change this to 5, 20, etc.
+  const isRunDisabled = checkedSpecs.length === 0 || (headed && browser === "");
+
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -1306,20 +1311,28 @@ function App() {
       });
     }
   };
-
-  const handleRunSpecs = async (specPaths) => {
+  const handleRunSpecs = async (specPaths, browser = null, headed = false) => {
     setIsRunning(true);
-    setRunOutput(""); // <-- clear previous output immediately
+    setRunOutput(""); // clear previous output immediately
     setRunError("");
     try {
+      const body = { specPaths };
+  
+      if (browser && browser.trim() !== "") {
+        body.browser = browser.trim();
+      }
+      if (headed) {
+        body.headed = true;
+      }
+  
       const resp = await fetch(`${API_URL}/run-automation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ specPaths }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
-
-      // Append all new output, or error if present
+  
+      // Append all new output or error if present
       if (data.output) setRunOutput((prev) => prev + data.output);
       if (data.error) setRunError((prev) => prev + data.error);
     } catch (e) {
@@ -1327,6 +1340,7 @@ function App() {
     }
     setIsRunning(false);
   };
+  
 
   const handleDelete = (branchName) => {
     // You can still use your confirmation dialog if needed!
@@ -2227,8 +2241,8 @@ function App() {
             minHeight: 50,
           }}
         >
-          {" "}
           <Box sx={{ width: "100%", mt: 4 }}>
+          </Box>
             {/* Header Row: Logo + Title (side by side, top) */}
             <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
               <CloudPulseLogo />
@@ -2741,371 +2755,294 @@ function App() {
             </Box>
 
             <Dialog
-              open={removeRemoteDialogOpen}
-              onClose={() => setRemoveRemoteDialogOpen(false)}
-              PaperProps={{
-                sx: {
-                  borderRadius: 3,
-                  minWidth: 400,
-                  p: 1,
-                  boxShadow: "0 8px 40px #6366f130", // subtle blue shadow for separation
-                  backgroundColor: "#fff", // WHITE
-                  color: "#1e293b", // Slate/Dark text
-                  border: "1.5px solid #e0e7ef", // Subtle border
-                },
-              }}
+  open={automationDialogOpen}
+  onClose={() => setAutomationDialogOpen(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: {
+      bgcolor: "#fff",
+      borderRadius: 4,
+      border: "1.5px solid #e0e7ef",
+      boxShadow: "0 8px 36px #94a3b840",
+      minWidth: { xs: "95vw", sm: 540 },
+      p: 1,
+    },
+  }}
+>
+  <DialogTitle
+    sx={{
+      fontWeight: 800,
+      color: "#1e293b",
+      fontSize: 22,
+      letterSpacing: 0,
+      borderRadius: "14px 14px 0 0",
+      bgcolor: "#f8fafc",
+      borderBottom: "2px solid #e5e7eb",
+      display: "flex",
+      alignItems: "center",
+    }}
+  >
+    Run Cypress Automation
+    <IconButton
+      sx={{ ml: "auto", color: "#64748b" }}
+      onClick={() => setAutomationDialogOpen(false)}
+      aria-label="close"
+    >
+      <CloseIcon />
+    </IconButton>
+  </DialogTitle>
+
+  <DialogContent sx={{ py: 2, bgcolor: "#fff", color: "#1e293b" }}>
+    <TextField
+      placeholder="Search specs"
+      value={specSearch}
+      onChange={(e) => setSpecSearch(e.target.value)}
+      fullWidth
+      margin="dense"
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <SearchIcon sx={{ color: "#64748b" }} />
+          </InputAdornment>
+        ),
+        endAdornment: !!specSearch && (
+          <InputAdornment position="end">
+            <IconButton
+              aria-label="clear search"
+              onClick={() => setSpecSearch("")}
+              edge="end"
+              size="small"
             >
-              <DialogTitle
-                sx={{
-                  color: "#1e293b", // dark header
-                  fontWeight: 700,
-                  textAlign: "center",
-                  fontSize: 24,
-                  pb: 0,
-                  pt: 2,
-                  letterSpacing: 0,
-                  bgcolor: "#f8fafc", // very light gray for header
-                  borderRadius: "8px 8px 0 0",
-                  borderBottom: "1.5px solid #e5e7eb",
-                }}
-              >
-                Remove Remote
-              </DialogTitle>
+              <CloseIcon sx={{ color: "#64748b" }} />
+            </IconButton>
+          </InputAdornment>
+        ),
+        sx: {
+          input: {
+            color: "#1e293b",
+            backgroundColor: "#fff",
+            fontWeight: 600,
+            letterSpacing: 0.2,
+            "::placeholder": { color: "#64748b", opacity: 1 },
+          },
+        },
+      }}
+      sx={{
+        mb: 2,
+        background: "#fff",
+        borderRadius: 1,
+        "& .MuiOutlinedInput-root": {
+          "& fieldset": { borderColor: "#e0e7ef" },
+          "&:hover fieldset": { borderColor: "#d1d5db" },
+          "&.Mui-focused fieldset": { borderColor: "#1e293b" },
+        },
+      }}
+    />
 
-              <DialogContent
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  pt: 2,
-                  pb: 0,
-                  bgcolor: "#fff",
-                }}
-              >
-                <RadioGroup
-                  value={selectedRemote}
-                  onChange={(e) => setSelectedRemote(e.target.value)}
-                  sx={{ width: "100%" }}
-                >
-                  {remotes.map((remote) => (
-                    <FormControlLabel
-                      key={remote}
-                      value={remote}
-                      control={
-                        <Radio
-                          sx={{
-                            color: "#2563eb",
-                            "&.Mui-checked": { color: "#2563eb" },
-                          }}
-                        />
-                      }
-                      label={
-                        <Typography sx={{ fontSize: 18, color: "#1e293b" }}>
-                          {remote}
-                        </Typography>
-                      }
-                      sx={{ my: 1 }}
-                    />
-                  ))}
-                </RadioGroup>
-                {remotes.length === 0 && (
-                  <Typography sx={{ fontSize: 18, color: "#64748b" }}>
-                    No remotes available
-                  </Typography>
-                )}
-              </DialogContent>
-              <DialogActions sx={{ px: 3, pb: 2, bgcolor: "#fff" }}>
-                <Button
-                  onClick={() => setRemoveRemoteDialogOpen(false)}
-                  sx={{
-                    color: "#2C2D2D", // light black color hex
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontSize: 16,
-                    border: "1.5px solid #2C2D2D", // border matching text color
-                    background: "#f9fafb", // very light background for contrast
-                    "&:hover": {
-                      color: "#1f2020", // slightly darker on hover
-                      border: "1.5px solid #1f2020",
-                      background: "#e5e7eb", // subtle background on hover
-                    },
-                  }}
-                  variant="outlined"
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  variant="contained"
-                  disabled={!selectedRemote}
-                  onClick={handleDeleteRemote}
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    textTransform: "none",
-                    borderRadius: 2,
-                    alignItems: "center",
-                    px: 3,
-                    py: 1,
-                    backgroundColor: "#111", // black background
-                    color: "#fff", // white text
-                    "&:hover": { backgroundColor: "#222" },
-                    "&.Mui-disabled": {
-                      backgroundColor: "#999",
-                      color: "#2C2D2D",
-                    },
-                  }}
-                >
-                  Delete
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </Box>
-          <Dialog
-            open={automationDialogOpen}
-            onClose={() => setAutomationDialogOpen(false)}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{
-              sx: {
-                bgcolor: "#fff",
-                borderRadius: 4,
-                border: "1.5px solid #e0e7ef",
-                boxShadow: "0 8px 36px #94a3b840",
-                minWidth: { xs: "95vw", sm: 540 },
-                p: 1,
-              },
+    {specLoading ? (
+      <Box textAlign="center" py={4}>
+        <CircularProgress />
+      </Box>
+    ) : filteredSpecs.length === 0 ? (
+      <Typography>No specs found.</Typography>
+    ) : (
+      <>
+        <Box display="flex" alignItems="center" mb={2}>
+          <Checkbox
+            checked={
+              filteredSpecs.length > 0 &&
+              filteredSpecs.every((spec) => checkedSpecs.includes(spec))
+            }
+            indeterminate={
+              checkedSpecs.length > 0 &&
+              checkedSpecs.length < filteredSpecs.length
+            }
+            onChange={(e) => {
+              if (e.target.checked) {
+                setCheckedSpecs(filteredSpecs);
+              } else {
+                setCheckedSpecs([]);
+              }
             }}
-          >
-            <DialogTitle
-              sx={{
-                fontWeight: 800,
-                color: "#1e293b",
-                fontSize: 22,
-                letterSpacing: 0,
-                borderRadius: "14px 14px 0 0",
-                bgcolor: "#f8fafc",
-                borderBottom: "2px solid #e5e7eb",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              Run Cypress Automation
-              <IconButton
-                sx={{ ml: "auto", color: "#64748b" }}
-                onClick={() => setAutomationDialogOpen(false)}
-                aria-label="close"
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ py: 2, bgcolor: "#fff", color: "#1e293b" }}>
-              <TextField
-                placeholder="Search specs"
-                value={specSearch}
-                onChange={(e) => setSpecSearch(e.target.value)}
-                fullWidth
-                margin="dense"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: "#64748b" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: !!specSearch && (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="clear search"
-                        onClick={() => setSpecSearch("")}
-                        edge="end"
-                        size="small"
-                      >
-                        <CloseIcon sx={{ color: "#64748b" }} />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    input: {
-                      color: "#1e293b",
-                      backgroundColor: "#fff",
-                      fontWeight: 600,
-                      letterSpacing: 0.2,
-                      "::placeholder": { color: "#64748b", opacity: 1 },
-                    },
-                  },
-                }}
-                sx={{
-                  mb: 2,
-                  background: "#fff",
-                  borderRadius: 1,
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": { borderColor: "#e5e7ef" },
-                    "&:hover fieldset": { borderColor: "#d1d5db" },
-                    "&.Mui-focused fieldset": { borderColor: "#1e293b" },
-                  },
+          />
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            Select All
+            {checkedSpecs.length > 0 ? ` (${checkedSpecs.length})` : ""}
+          </Typography>
+        </Box>
+
+        <Box sx={{ overflowY: "auto", pr: 2, maxHeight: 360 }}>
+          {currentPageSpecs.map((spec) => (
+            <Box key={spec} display="flex" alignItems="center" py={0.2}>
+              <Checkbox
+                checked={checkedSpecs.includes(spec)}
+                onChange={() => {
+                  let newChecked;
+                  if (checkedSpecs.includes(spec)) {
+                    newChecked = checkedSpecs.filter((s) => s !== spec);
+                  } else {
+                    newChecked = [...checkedSpecs, spec];
+                  }
+                  setCheckedSpecs(newChecked);
                 }}
               />
-
-              {specLoading ? (
-                <Box textAlign="center" py={4}>
-                  <CircularProgress />
-                </Box>
-              ) : filteredSpecs.length === 0 ? (
-                <Typography>No specs found.</Typography>
-              ) : (
-                <>
-                  {/* GLOBAL SELECT ALL */}
-                  <Box display="flex" alignItems="center" mb={2}>
-                    <Checkbox
-                      checked={
-                        filteredSpecs.length > 0 &&
-                        filteredSpecs.every((spec) =>
-                          checkedSpecs.includes(spec),
-                        )
-                      }
-                      indeterminate={
-                        checkedSpecs.length > 0 &&
-                        checkedSpecs.length < filteredSpecs.length
-                      }
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setCheckedSpecs(filteredSpecs);
-                        } else {
-                          setCheckedSpecs([]);
-                        }
-                      }}
-                    />
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      Select All
-                      {checkedSpecs.length > 0
-                        ? ` (${checkedSpecs.length})`
-                        : ""}
-                    </Typography>
-                  </Box>
-
-                  {/* PAGE CHECKLIST */}
-                  <Box sx={{ overflowY: "auto", pr: 2, maxHeight: 360 }}>
-                    {currentPageSpecs.map((spec) => (
-                      <Box
-                        key={spec}
-                        display="flex"
-                        alignItems="center"
-                        py={0.2}
-                      >
-                        <Checkbox
-                          checked={checkedSpecs.includes(spec)}
-                          onChange={() => {
-                            let newChecked;
-                            if (checkedSpecs.includes(spec)) {
-                              newChecked = checkedSpecs.filter(
-                                (s) => s !== spec,
-                              );
-                            } else {
-                              newChecked = [...checkedSpecs, spec];
-                            }
-                            setCheckedSpecs(newChecked);
-                          }}
-                        />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "monospace",
-                            color: "#1e293b",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {spec.split("/").pop()}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                  {/* Pagination Controls */}
-                  <Box display="flex" justifyContent="center" mt={2}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={page <= 1}
-                      onClick={() => setPage((cur) => Math.max(1, cur - 1))}
-                      sx={{ minWidth: 32, mr: 2 }}
-                    >
-                      {"<"}
-                    </Button>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        minWidth: 32,
-                        textAlign: "center",
-                        color: "#1e293b",
-                      }}
-                    >
-                      {page} / {pageCount}
-                    </Typography>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={page >= pageCount}
-                      onClick={() =>
-                        setPage((cur) => Math.min(pageCount, cur + 1))
-                      }
-                      sx={{ minWidth: 32, ml: 2 }}
-                    >
-                      {">"}
-                    </Button>
-                  </Box>
-                </>
-              )}
-            </DialogContent>
-            <DialogActions
-              sx={{ borderTop: "1px solid #e0e7ef", bgcolor: "#f8fafc" }}
-            >
-              <Button
-                onClick={() => setAutomationDialogOpen(false)}
-                variant="outlined"
+              <Typography
+                variant="body2"
                 sx={{
-                  borderColor: "#d1d5db",
+                  fontFamily: "monospace",
                   color: "#1e293b",
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  px: 2.5,
-                  py: 1,
-                  background: "#fff",
-                  textTransform: "none",
-                  "&:hover": {
-                    borderColor: "#1e293b",
-                    background: "#f3f3f3",
-                  },
+                  fontWeight: 600,
                 }}
               >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                disabled={checkedSpecs.length === 0}
-                onClick={() => {
-                  setAutomationDialogOpen(false);
-                  handleRunSpecs(checkedSpecs);
-                }}
-                sx={{
-                  bgcolor: "#1e293b",
-                  color: "#fff",
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  px: 2.5,
-                  py: 1,
-                  textTransform: "none",
-                  boxShadow: "none",
-                  "&:hover": {
-                    bgcolor: "#111827",
-                  },
-                }}
-              >
-                Run Selected
-                {checkedSpecs.length > 0 ? ` (${checkedSpecs.length})` : ""}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                {spec.split("/").pop()}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        <Box display="flex" justifyContent="center" mt={2}>
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={page <= 1}
+            onClick={() => setPage((cur) => Math.max(1, cur - 1))}
+            sx={{ minWidth: 32, mr: 2 }}
+          >
+            {"<"}
+          </Button>
+          <Typography
+            variant="body2"
+            sx={{ minWidth: 32, textAlign: "center", color: "#1e293b" }}
+          >
+            {page} / {pageCount}
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={page >= pageCount}
+            onClick={() => setPage((cur) => Math.min(pageCount, cur + 1))}
+            sx={{ minWidth: 32, ml: 2 }}
+          >
+            {">"}
+          </Button>
+        </Box>
+      </>
+    )}
+
+    {/* Headed checkbox */}
+    <Box sx={{ mt: 3 }}>
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={headed}
+            onChange={(e) => setHeaded(e.target.checked)}
+            sx={{
+              color: "#1e293b",
+              "&.Mui-checked": { color: "#1e293b" },
+            }}
+          />
+        }
+        label={
+          <Typography sx={{ color: "#1e293b", fontWeight: 600 }}>
+            Run in headed mode
+          </Typography>
+        }
+      />
+    </Box>
+
+    {/* Browser selection shown only if headed */}
+    {headed && (
+      <Box sx={{ mt: 2 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{ fontWeight: 700, mb: 1, color: "#1e293b" }}
+        >
+          Choose browser
+        </Typography>
+        <Select
+          value={browser}
+          onChange={(e) => setBrowser(e.target.value)}
+          fullWidth
+          displayEmpty
+          size="small"
+          sx={{
+            bgcolor: "#fff",
+            color: "#000",
+            fontWeight: 600,
+            "& .MuiSelect-select": { color: "#000" },
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e0e7ef" },
+            "&:hover .MuiOutlinedInput-notchedOutline": {
+              borderColor: "#1e293b",
+              borderWidth: 1,
+            },
+            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+              borderColor: "#1e293b",
+              borderWidth: 1,
+            },
+          }}
+        >
+          <MenuItem value="">
+            <em>Select browser</em>
+          </MenuItem>
+          <MenuItem value="chrome">Chrome</MenuItem>
+          <MenuItem value="firefox">Firefox</MenuItem>
+        </Select>
+      </Box>
+    )}
+  </DialogContent>
+
+  <DialogActions
+    sx={{ borderTop: "1px solid #e0e7ef", bgcolor: "#f8fafc" }}
+  >
+    <Button
+      onClick={() => setAutomationDialogOpen(false)}
+      variant="outlined"
+      sx={{
+        borderColor: "#d1d5db",
+        color: "#1e293b",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        background: "#fff",
+        textTransform: "none",
+        "&:hover": {
+          borderColor: "#1e293b",
+          background: "#f3f3f3",
+        },
+      }}
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="contained"
+      disabled={isRunDisabled}
+      onClick={() => {
+        setAutomationDialogOpen(false);
+        handleRunSpecs(checkedSpecs, browser, headed);
+      }}
+      sx={{
+        bgcolor: "#1e293b",
+        color: "#fff",
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        py: 1,
+        textTransform: "none",
+        boxShadow: "none",
+        "&:hover": {
+          bgcolor: "#111827",
+        },
+      }}
+    >
+      Run Selected
+      {checkedSpecs.length > 0 ? ` (${checkedSpecs.length})` : ""}
+    </Button>
+  </DialogActions>
+</Dialog>
+
+            
           {/* Create Branch Dialog */}
           <Dialog
             open={createBranchDialogOpen}
