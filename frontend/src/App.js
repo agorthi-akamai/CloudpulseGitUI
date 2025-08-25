@@ -1366,7 +1366,7 @@ const getDefaultStashMessage = (branchName) => {
         <span style={{ fontWeight: 700, color: "#fff" }}>Created From</span>
       ),
       renderCell: (params) => (
-        <span style={{ color: "#e0e7ef", fontWeight: 600 }}>
+        <span style={{ color: "#e0e7ef", fontWeight: 500 }}>
           {params.value || "-"}
         </span>
       ),
@@ -3713,11 +3713,16 @@ PaperProps={{
 >
 
               <DataGrid
-              autoHeight
-              elevation={4}
+               style={{ width: '100%', height: 'auto' }}             
+               elevation={4}
+               initialState={{
+                sorting: {
+                  sortModel: [{ field: 'date', sort: 'desc' }],
+                },
+              }}
               rows={branches}
               columns={columns}
-              pageSize={2}
+              pageSize={pageSize}
               pagination
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               disableColumnMenu
@@ -3771,7 +3776,7 @@ PaperProps={{
     },
   }}
 >
-  <DialogTitle sx={{ fontWeight: 700, color: "#0284c7" }}>
+  <DialogTitle sx={{ fontWeight: 700, color: "black" }}>
     Commit History ─ {currentBranch}
   </DialogTitle>
   <DialogContent sx={{ maxHeight: 500, overflowY: "auto", bgcolor: "#fff", color: "#111" }}>
@@ -4062,8 +4067,8 @@ PaperProps={{
               pb: 0.5,
               bgcolor: "#f0f9ff",
               borderRadius: "10px 10px 0 0",
-              fontWeight: 800,
-              color: "#0ea5e9",
+              fontWeight: 'bold',
+              color: "black",
             }}
           >
             <GitHubIcon sx={{ color: "#0ea5e9" }} />
@@ -4113,7 +4118,7 @@ PaperProps={{
                       }}
                     >
                       <thead>
-                        <tr style={{ fontWeight: 700, color: "#0ea5e9" }}>
+                      <tr style={{ fontWeight: "bold", color: "black" }}> 
                           <th style={{ textAlign: "left", padding: 8 }}>
                             File
                           </th>
@@ -4130,8 +4135,9 @@ PaperProps={{
                                 padding: 8,
                                 fontFamily: "monospace",
                                 fontSize: 15,
-                                fontWeight: 600,
+                                fontWeight: 500,
                                 wordBreak: "break-all",
+                                 color: "black", 
                               }}
                             >
                               {row.file}
@@ -4196,7 +4202,18 @@ PaperProps={{
               color="primary"
               variant="outlined"
               startIcon={<CloseIcon />}
-              sx={{ borderRadius: 2, fontWeight: 700, minWidth: 90 }}
+              sx={{
+                borderRadius: 2,
+                fontWeight: 700,
+                minWidth: 90,
+                color: "black",           // <-- add this line
+                borderColor: "black",     // optional: makes the outline also black
+                '&:hover': {
+                  color: "black",         // ensures text stays black on hover
+                  borderColor: "black",   // ensures border stays black on hover
+                  backgroundColor: "#f3f4f6", // light gray on hover, optional
+                }
+              }}
             >
               Close
             </Button>
