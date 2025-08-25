@@ -2153,23 +2153,33 @@ PaperProps={{
       }}
       sx={{ mb: 2 }}
     >
-      <FormControlLabel
-        value="stash"
-        control={
-          <Radio
-            sx={{ color: "#111", "&.Mui-checked": { color: "#0ea5e9" } }}
-          />
-        }
-        label="Stash"
-      />
+     <FormControlLabel
+  value="stash"
+  control={
+    <Radio
+      sx={{
+        color: "#000",                  // Unchecked color: black
+        "&.Mui-checked": { color: "#0ea5e9" }, // Checked color: your blue
+        "& .MuiSvgIcon-root": { fontSize: 22 } // (Optional) Increase icon size
+      }}
+    />
+  }
+  label="Stash"
+  sx={{ color: "#000" }} // <- Ensures label is black
+/>
+
       <FormControlLabel
         value="unstash"
         control={
           <Radio
-            sx={{ color: "#111", "&.Mui-checked": { color: "#0ea5e9" } }}
+          sx={{
+            color: "#111",
+            "&.Mui-checked": { color: "#0ea5e9" }
+          }}
           />
         }
         label="Unstash"
+        sx={{ color: "#000" }} // <- Ensures label is black
       />
     </RadioGroup>
 
@@ -3911,128 +3921,287 @@ PaperProps={{
 
         </Paper>
         {/* Confirm Delete Selected Snackbar */}
-      {/* Confirm Delete Selected Dialog */}
-<Dialog
-  open={confirmDelete.open}
-  onClose={() => setConfirmDelete({ open: false, branchName: "" })}
-  aria-labelledby="delete-branch-dialog-title"
-  maxWidth="xs"
-  fullWidth
-  slotProps={{
-    paper: {
-      sx: {
-        borderRadius: 4,
-        bgcolor: "#f8fafc", // light grey/white background
-        color: "#1e293b", // dark grey text
-        p: 0,
-        overflow: "visible",
-        minWidth: "fit-content",
-        maxWidth: 300,
-        border: "2px solid #e2e8f0", // light grey border
-      },
-    },
-  }}
->
-  <DialogTitle
-    id="delete-branch-dialog-title"
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      bgcolor: "#e2e8f0", // medium grey header
-      color: "#1e293b", // dark slate text
-      borderRadius: "4px 4px 0 0",
-      borderBottom: "1.5px solid #64748b", // grey border to match your table
-      fontWeight: 700,
-      fontSize: 22,
-      pb: 1,
-      pt: 2,
-    }}
-  >
-    <WarningAmberRoundedIcon sx={{ color: "#f59e0b", mr: 1 }} /> {/* amber warning color */}
-    Confirm Deletion
-  </DialogTitle>
-  <DialogContent sx={{ py: 2.5, px: 3, bgcolor: "#f8fafc", color: "#374151" }}>
-    <Typography variant="body1" sx={{ fontSize: 18, color: "#4b5563" }}>
-      Are you sure you want to delete branch{" "}
-      <span style={{ color: "#dc2626", fontWeight: 700 }}>
-        {confirmDelete.branchName}
-      </span>
-      ?
-    </Typography>
-  </DialogContent>
-  <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 0, bgcolor: "#f8fafc" }}>
-    <Button
-      color="error"
-      variant="contained"
-      sx={{
-        minWidth: 110,
-        fontWeight: 700,
-        borderRadius: 2,
-        fontSize: 18,
-        px: 3,
-        py: 1.2,
-        boxShadow: "none",
-        bgcolor: "#dc2626", // red for delete
-        "&:hover": {
-          bgcolor: "#b91c1c",
-        },
-      }}
-      onClick={handleConfirmDelete}
-      disabled={deletingBranches.has(confirmDelete.branchName)}
-      startIcon={
-        deletingBranches.has(confirmDelete.branchName) ? (
-          <CircularProgress size={18} color="inherit" />
-        ) : (
-          <DeleteIcon />
-        )
-      }
-    >
-      {deletingBranches.has(confirmDelete.branchName)
-        ? "Deleting..."
-        : "DELETE"}
-    </Button>
-    <Button
-      variant="outlined"
-      sx={{
-        minWidth: 110,
-        fontWeight: 700,
-        borderRadius: 2,
-        fontSize: 18,
-        ml: 2,
-        px: 3,
-        py: 1.2,
-        color: "#374151", // dark grey text
-        borderColor: "#64748b", // grey border
-        background: "#f1f5f9", // light grey background
-        "&:hover": {
-          borderColor: "#475569",
-          color: "#1e293b",
-          background: "#e2e8f0",
-        },
-      }}
-      onClick={() => setConfirmDelete({ open: false, branchName: "" })}
-      disabled={deletingBranches.has(confirmDelete.branchName)}
-    >
-      CANCEL
-    </Button>
-  </DialogActions>
-  <Snackbar
-  open={snackbar.open}
-  autoHideDuration={4000}
-  onClose={() => setSnackbar({ ...snackbar, open: false })}
-  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
->
-  <Alert
-    onClose={() => setSnackbar({ ...snackbar, open: false })}
-    severity={snackbar.severity}
-    sx={{ width: '100%' }}
-  >
-    {snackbar.message}
-  </Alert>
-</Snackbar>
-
-</Dialog>
+     {/* Confirm Delete Selected Dialog */}
+     <Dialog
+          open={confirmDelete.open}
+          onClose={() => setConfirmDelete({ open: false, branchName: "" })}
+          aria-labelledby="delete-branch-dialog-title"
+          maxWidth="xs"
+          fullWidth
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: 4,
+                bgcolor: "#fff",
+                p: 0,
+                overflow: "visible",
+                minWidth: "fit-content",
+                maxWidth: 300,
+              },
+            },
+          }}
+        >
+          <DialogTitle
+            id="delete-branch-dialog-title"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              bgcolor: "#e0f2fe", // light blue header
+              color: "#1674d3",
+              borderRadius: "4px 4px 0 0",
+              borderBottom: "1.5px solid #38bdf8",
+              fontWeight: 700,
+              fontSize: 22,
+              pb: 1,
+              pt: 2,
+            }}
+          >
+            <WarningAmberRoundedIcon sx={{ color: "#38bdf8", mr: 1 }} />
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent sx={{ py: 2.5, px: 3 }}>
+            <Typography variant="body1" sx={{ fontSize: 18, color: "#164e63" }}>
+              Are you sure you want to delete branch{" "}
+              <span style={{ color: "#dc2626", fontWeight: 700 }}>
+                {confirmDelete.branchName}
+              </span>
+              ?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 0 }}>
+            <Button
+              color="error"
+              variant="contained"
+              sx={{
+                minWidth: 110,
+                fontWeight: 700,
+                borderRadius: 2,
+                fontSize: 18,
+                px: 3,
+                py: 1.2,
+                boxShadow: "0 2px 8px #38bdf84a",
+              }}
+              onClick={handleConfirmDelete}
+              disabled={deletingBranches.has(confirmDelete.branchName)}
+              startIcon={
+                deletingBranches.has(confirmDelete.branchName) ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <DeleteIcon />
+                )
+              }
+            >
+              {deletingBranches.has(confirmDelete.branchName)
+                ? "Deleting..."
+                : "DELETE"}
+            </Button>
+            <Button
+              color="info"
+              variant="outlined"
+              sx={{
+                minWidth: 110,
+                fontWeight: 700,
+                borderRadius: 2,
+                fontSize: 18,
+                ml: 2,
+                px: 3,
+                py: 1.2,
+                color: "#1674d3",
+                borderColor: "#38bdf8",
+                background: "#e0f2fe",
+                "&:hover": {
+                  borderColor: "#2563eb",
+                  color: "#2563eb",
+                  background: "#bae6fd",
+                },
+              }}
+              onClick={() => setConfirmDelete({ open: false, branchName: "" })}
+              disabled={deletingBranches.has(confirmDelete.branchName)}
+            >
+              CANCEL
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* General Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            severity={snackbar.severity}
+            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+        {/* TS File Stats Dialog */}
+        <Dialog
+          open={statsOpen}
+          onClose={() => setStatsOpen(false)}
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              bgcolor: "#ffffff",
+              borderRadius: 4,
+              borderLeft: "8px solid #0ea5e9",
+              boxShadow: "0 8px 32px #dbeafe80",
+              minWidth: { xs: "95vw", sm: "540px" },
+              p: 1,
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              pb: 0.5,
+              bgcolor: "#f0f9ff",
+              borderRadius: "10px 10px 0 0",
+              fontWeight: 800,
+              color: "#0ea5e9",
+            }}
+          >
+            <GitHubIcon sx={{ color: "#0ea5e9" }} />
+            .ts File Change Stats — <span>{statsBranch}</span>
+            <IconButton
+              onClick={() => setStatsOpen(false)}
+              sx={{ ml: "auto" }}
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <Divider />
+          <DialogContent sx={{ py: 2 }}>
+            {statsLoading && (
+              <Box sx={{ textAlign: "center", my: 3, position: "sticky" }}>
+                <CircularProgress
+                  thickness={5}
+                  size={44}
+                  sx={{ color: "#0ea5e9" }}
+                />
+              </Box>
+            )}
+            {!statsLoading && statsError && (
+              <Typography
+                color="error"
+                sx={{ mt: 3, mb: 3, fontSize: 22, textAlign: "center" }}
+              >
+                {statsError}
+              </Typography>
+            )}
+            {!statsLoading &&
+              !statsError &&
+              Array.isArray(statsData) &&
+              statsData.length > 0 && (
+                <Box sx={{ mt: 2, mb: 1, position: "sticky" }}>
+                  <Paper
+                    elevation={2}
+                    sx={{ borderRadius: 3, p: 2, bgcolor: "#f3f7fa" }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "separate",
+                        borderSpacing: "0 8px",
+                        fontSize: 16,
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ fontWeight: 700, color: "#0ea5e9" }}>
+                          <th style={{ textAlign: "left", padding: 8 }}>
+                            File
+                          </th>
+                          <th style={{ padding: 8 }}>+ Added</th>
+                          <th style={{ padding: 8 }}>– Deleted</th>
+                          <th style={{ padding: 8 }}>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statsData.map((row) => (
+                          <tr key={row.file} style={{ background: "#fff" }}>
+                            <td
+                              style={{
+                                padding: 8,
+                                fontFamily: "monospace",
+                                fontSize: 15,
+                                fontWeight: 600,
+                                wordBreak: "break-all",
+                              }}
+                            >
+                              {row.file}
+                            </td>
+                            <td style={{ padding: 8 }}>
+                              <Chip
+                                label={`+${row.added}`}
+                                sx={{
+                                  bgcolor: "#e0fce4",
+                                  color: "#16a34a",
+                                  fontWeight: 700,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: 8 }}>
+                              <Chip
+                                label={`–${row.deleted}`}
+                                sx={{
+                                  bgcolor: "#fee2e2",
+                                  color: "#dc2626",
+                                  fontWeight: 700,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: 8 }}>
+                              <Chip
+                                label={
+                                  row.net > 0
+                                    ? `+${row.net}`
+                                    : row.net < 0
+                                      ? `${row.net}`
+                                      : "0"
+                                }
+                                sx={{
+                                  bgcolor:
+                                    row.net > 0
+                                      ? "#e0fce4"
+                                      : row.net < 0
+                                        ? "#fee2e2"
+                                        : "#e5e7eb",
+                                  color:
+                                    row.net > 0
+                                      ? "#16a34a"
+                                      : row.net < 0
+                                        ? "#dc2626"
+                                        : "#171717",
+                                  fontWeight: 700,
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Paper>
+                </Box>
+              )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, justifyContent: "center" }}>
+            <Button
+              onClick={() => setStatsOpen(false)}
+              color="primary"
+              variant="outlined"
+              startIcon={<CloseIcon />}
+              sx={{ borderRadius: 2, fontWeight: 700, minWidth: 90 }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
 
       </Paper>
     </Container>
