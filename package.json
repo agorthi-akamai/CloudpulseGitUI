@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@mui/material": "^7.3.1",
     "@mui/x-data-grid-pro": "^8.9.2"
   },
   "devDependencies": {
