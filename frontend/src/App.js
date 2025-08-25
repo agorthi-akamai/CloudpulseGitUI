@@ -1033,18 +1033,17 @@ function App() {
       {...props}
       arrow
       placement="top"
-      classes={{ tooltip: className }} // <-- FIXED HERE!!
+      classes={{ tooltip: className }}
     />
   ))(() => ({
     [`&.${tooltipClasses.tooltip}`]: {
-      // <-- FIXED SELECTOR!
       background: "#fff",
-      color: "#0ea5e9",
-      border: "1.5px solid #bae6fd",
+      color: "#111", // Change here to solid black (#111 or use 'black')
+      border: "1.5px solid #d1d5db",
       fontWeight: 600,
       fontSize: 15,
       borderRadius: 9,
-      boxShadow: "0 4px 14px 2px #bae6fd26",
+      boxShadow: "0 4px 14px 2px #d1d5db",
       padding: "7px 16px",
       marginBottom: "7px",
     },
@@ -1053,6 +1052,7 @@ function App() {
       filter: "drop-shadow(0 2px 7px #bae6fd55)",
     },
   }));
+  
 
   // Create new branch handler
   const handleCreateBranch = async () => {
@@ -1467,43 +1467,45 @@ function App() {
           remotes.find((remote) => branchName.includes(remote)) || "default";
         const color = branchTypeColors[foundRemote] || branchTypeColors.default;
         return (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              maxWidth: 285,
-              cursor: "pointer",
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-            }}
-            onClick={() => handleShowStats(params.value)}
-            title={params.value}
-          >
+          <FloatingWhiteTooltip title={params.value} arrow placement="top">
             <Box
               sx={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                bgcolor: color,
-                mr: 1,
-                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                maxWidth: 285,
+                cursor: "pointer",
+                textOverflow: "ellipsis",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
               }}
-            />
-            <Typography
-              noWrap
-              sx={{
-                fontWeight: 500,
-                color: "#fff", // <-- make white, not "#2563eb" or "#38bdf8"
-                userSelect: "text",
-              }}
+              onClick={() => handleShowStats(params.value)}
             >
-              {params.value}
-            </Typography>
-          </Box>
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  bgcolor: color,
+                  mr: 1,
+                  flexShrink: 0,
+                }}
+              />
+              <Typography
+                noWrap
+                sx={{
+                  fontWeight: 500,
+                  color: "#fff",
+                  userSelect: "text",
+                }}
+              >
+                {params.value}
+              </Typography>
+            </Box>
+          </FloatingWhiteTooltip>
         );
       },
     },
+    
     {
       field: "date",
       headerName: "Branch Creation Date",
