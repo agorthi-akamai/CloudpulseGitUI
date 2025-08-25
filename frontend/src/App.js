@@ -200,6 +200,7 @@ function App() {
   const [isServerRunning, setIsServerRunning] = useState(false);
   const [serverOutput, setServerOutput] = useState("");
   const [serverError, setServerError] = useState("");
+  const [specSearch, setSpecSearch] = useState(""); // Place this near specList or checkedSpecs in App()
 
   // Instead of opening and closing in same event tick:
 
@@ -220,7 +221,6 @@ function App() {
       setPendingCompareBranch(null);
     }
   }, [menuAnchorEl, pendingCompareBranch]);
-  
 
   // Delete confirmations
   const [confirmDelete, setConfirmDelete] = useState({
@@ -286,6 +286,8 @@ function App() {
   const [isOpeningCreateDialog, setIsOpeningCreateDialog] = useState(false);
   const [showChangeset, setShowChangeset] = useState(false);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const specsPerPage = 10; // You can change this to 5, 20, etc.
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -341,7 +343,7 @@ function App() {
     setMenuAnchorEl(event.currentTarget);
     setMenuBranch(branchName);
   };
-  
+
   const handleCloseMenu = () => {
     setMenuAnchorEl(null);
     setMenuBranch(null);
@@ -351,13 +353,13 @@ function App() {
     setCompareDialogOpen(true);
     setPendingCompareBranch(null);
   };
-  
+
   // Explicit dialog close handler:
   const handleDialogClose = () => {
     setCompareDialogOpen(false);
     setPendingCompareBranch(null);
   };
-  
+
   const handleOpenRemoveRemote = async () => {
     try {
       const res = await fetch(`${API_URL}/remotes`);
@@ -582,6 +584,24 @@ function App() {
     () => debounce(fetchSuggestions, 400),
     [],
   );
+
+  const filteredSpecs = useMemo(
+    () =>
+      specList.filter((spec) =>
+        spec.toLowerCase().includes(specSearch.trim().toLowerCase()),
+      ),
+    [specList, specSearch],
+  );
+  const pageCount = Math.ceil(filteredSpecs.length / specsPerPage);
+  const currentPageSpecs = useMemo(
+    () => filteredSpecs.slice((page - 1) * specsPerPage, page * specsPerPage),
+    [filteredSpecs, page, specsPerPage],
+  );
+
+  // On new search, always go to first page
+  useEffect(() => {
+    setPage(1);
+  }, [specSearch]);
 
   useEffect(() => {
     document.title = "Git Dashboard";
@@ -1052,7 +1072,6 @@ function App() {
       filter: "drop-shadow(0 2px 7px #bae6fd55)",
     },
   }));
-  
 
   // Create new branch handler
   const handleCreateBranch = async () => {
@@ -1363,21 +1382,35 @@ function App() {
       minWidth: 120,
       flex: 0.9,
       renderHeader: () => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, height: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            pl: 1,
+            height: 1,
+          }}
+        >
           <img
             src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/jira.svg"
             alt="Jira"
-            style={{ width: 19, height: 19, display: "block", verticalAlign: "middle", filter: "brightness(2)" }}
+            style={{
+              width: 19,
+              height: 19,
+              display: "block",
+              verticalAlign: "middle",
+              filter: "brightness(2)",
+            }}
           />
           <Typography
             variant="subtitle2"
             sx={{ fontWeight: 700, color: "#fff", lineHeight: 1 }}
           >
-          Bug Ticket
+            Bug Ticket
           </Typography>
         </Box>
       ),
-      
+
       renderCell: (params) => (
         <Box sx={{ display: "flex", alignItems: "center", height: 1, pl: 0.5 }}>
           {params.value && params.value.startsWith("DI-") ? (
@@ -1445,14 +1478,14 @@ function App() {
                 "& .MuiChip-label": {
                   lineHeight: "32px",
                   px: 0,
-                }
+                },
               }}
             />
           )}
         </Box>
       ),
     },
-    
+
     {
       field: "name",
       headerName: "Branch Name",
@@ -1505,7 +1538,7 @@ function App() {
         );
       },
     },
-    
+
     {
       field: "date",
       headerName: "Branch Creation Date",
@@ -1674,8 +1707,8 @@ function App() {
               </MenuItem>
 
               <Dialog
-              open={compareDialogOpen}
-              onClose={() => setCompareDialogOpen(false)}
+                open={compareDialogOpen}
+                onClose={() => setCompareDialogOpen(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
@@ -2126,7 +2159,7 @@ function App() {
                         backgroundColor: "#f3f4f6",
                         borderColor: "#111",
                         color: "#111",
-                        textTransform: "none"
+                        textTransform: "none",
                       },
                     }}
                   >
@@ -2837,7 +2870,7 @@ function App() {
             fullWidth
             PaperProps={{
               sx: {
-                bgcolor: "#fff", // white dialog
+                bgcolor: "#fff",
                 borderRadius: 4,
                 border: "1.5px solid #e0e7ef",
                 boxShadow: "0 8px 36px #94a3b840",
@@ -2869,32 +2902,92 @@ function App() {
               </IconButton>
             </DialogTitle>
             <DialogContent sx={{ py: 2, bgcolor: "#fff", color: "#1e293b" }}>
+              <TextField
+                placeholder="Search specs"
+                value={specSearch}
+                onChange={(e) => setSpecSearch(e.target.value)}
+                fullWidth
+                margin="dense"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: "#64748b" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: !!specSearch && (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="clear search"
+                        onClick={() => setSpecSearch("")}
+                        edge="end"
+                        size="small"
+                      >
+                        <CloseIcon sx={{ color: "#64748b" }} />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    input: {
+                      color: "#1e293b",
+                      backgroundColor: "#fff",
+                      fontWeight: 600,
+                      letterSpacing: 0.2,
+                      "::placeholder": { color: "#64748b", opacity: 1 },
+                    },
+                  },
+                }}
+                sx={{
+                  mb: 2,
+                  background: "#fff",
+                  borderRadius: 1,
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { borderColor: "#e5e7ef" },
+                    "&:hover fieldset": { borderColor: "#d1d5db" },
+                    "&.Mui-focused fieldset": { borderColor: "#1e293b" },
+                  },
+                }}
+              />
+
               {specLoading ? (
                 <Box textAlign="center" py={4}>
                   <CircularProgress />
                 </Box>
-              ) : specList.length === 0 ? (
+              ) : filteredSpecs.length === 0 ? (
                 <Typography>No specs found.</Typography>
               ) : (
                 <>
+                  {/* GLOBAL SELECT ALL */}
                   <Box display="flex" alignItems="center" mb={2}>
                     <Checkbox
-                      checked={selectAll}
+                      checked={
+                        filteredSpecs.length > 0 &&
+                        filteredSpecs.every((spec) =>
+                          checkedSpecs.includes(spec),
+                        )
+                      }
                       indeterminate={
                         checkedSpecs.length > 0 &&
-                        checkedSpecs.length < specList.length
+                        checkedSpecs.length < filteredSpecs.length
                       }
                       onChange={(e) => {
-                        setSelectAll(e.target.checked);
-                        setCheckedSpecs(e.target.checked ? [...specList] : []);
+                        if (e.target.checked) {
+                          setCheckedSpecs(filteredSpecs);
+                        } else {
+                          setCheckedSpecs([]);
+                        }
                       }}
                     />
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
                       Select All
+                      {checkedSpecs.length > 0
+                        ? ` (${checkedSpecs.length})`
+                        : ""}
                     </Typography>
                   </Box>
-                  <Box sx={{ overflowY: "auto", pr: 2, position: "sticky" }}>
-                    {specList.map((spec) => (
+
+                  {/* PAGE CHECKLIST */}
+                  <Box sx={{ overflowY: "auto", pr: 2, maxHeight: 360 }}>
+                    {currentPageSpecs.map((spec) => (
                       <Box
                         key={spec}
                         display="flex"
@@ -2909,11 +3002,8 @@ function App() {
                               newChecked = checkedSpecs.filter(
                                 (s) => s !== spec,
                               );
-                              setSelectAll(false);
                             } else {
                               newChecked = [...checkedSpecs, spec];
-                              if (newChecked.length === specList.length)
-                                setSelectAll(true);
                             }
                             setCheckedSpecs(newChecked);
                           }}
@@ -2930,6 +3020,39 @@ function App() {
                         </Typography>
                       </Box>
                     ))}
+                  </Box>
+                  {/* Pagination Controls */}
+                  <Box display="flex" justifyContent="center" mt={2}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={page <= 1}
+                      onClick={() => setPage((cur) => Math.max(1, cur - 1))}
+                      sx={{ minWidth: 32, mr: 2 }}
+                    >
+                      {"<"}
+                    </Button>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        minWidth: 32,
+                        textAlign: "center",
+                        color: "#1e293b",
+                      }}
+                    >
+                      {page} / {pageCount}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={page >= pageCount}
+                      onClick={() =>
+                        setPage((cur) => Math.min(pageCount, cur + 1))
+                      }
+                      sx={{ minWidth: 32, ml: 2 }}
+                    >
+                      {">"}
+                    </Button>
                   </Box>
                 </>
               )}
@@ -2978,147 +3101,8 @@ function App() {
                   },
                 }}
               >
-                Run Selected{" "}
-                {checkedSpecs.length > 0 ? `(${checkedSpecs.length})` : ""}
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Dialog
-            open={addRemoteDialogOpen}
-            onClose={() => {
-              setAddRemoteDialogOpen(false);
-              setNewRemoteName("");
-              setNewRemoteUrl("");
-            }}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{
-              sx: {
-                bgcolor: "#fff",
-                borderRadius: 4,
-                border: "1.5px solid #e0e7ef",
-                boxShadow: "0 8px 36px #94a3b840",
-                minWidth: 400,
-              },
-            }}
-          >
-            <DialogTitle
-              sx={{
-                fontWeight: 800,
-                color: "#1e293b",
-                fontSize: 22,
-                letterSpacing: 0,
-                borderRadius: "14px 14px 0 0",
-                bgcolor: "#f8fafc",
-                borderBottom: "2px solid #e5e7eb",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              Add Git Remote
-              <IconButton
-                sx={{ ml: "auto", color: "#64748b" }}
-                onClick={() => {
-                  setAddRemoteDialogOpen(false);
-                  setNewRemoteName("");
-                  setNewRemoteUrl("");
-                }}
-                aria-label="close"
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent sx={{ bgcolor: "#fff", color: "#1e293b", pb: 1.5 }}>
-              <TextField
-                label="Remote URL"
-                value={newRemoteUrl ?? ""} // <- fallback to empty string
-                onChange={handleRemoteUrlChange}
-                fullWidth
-                margin="normal"
-                required
-                sx={{
-                  input: { color: "#1e293b" },
-                  label: { color: "#1e293b" },
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": { borderColor: "#e5e7eb" },
-                    "&:hover fieldset": { borderColor: "#d1d5db" },
-                    "&.Mui-focused fieldset": { borderColor: "#1e293b" },
-                  },
-                }}
-                InputLabelProps={{ style: { color: "#1e293b" } }}
-              />
-
-              <TextField
-                label="Remote Name"
-                value={newRemoteName ?? ""} // <- fallback to empty string
-                onChange={(e) => setNewRemoteName(e.target.value)}
-                fullWidth
-                margin="normal"
-                required
-                sx={{
-                  input: { color: "#1e293b" },
-                  label: { color: "#1e293b" },
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": { borderColor: "#e5e7eb" },
-                    "&:hover fieldset": { borderColor: "#d1d5db" },
-                    "&.Mui-focused fieldset": { borderColor: "#1e293b" },
-                  },
-                }}
-                InputLabelProps={{ style: { color: "#1e293b" } }}
-                helperText={suggestedName ? `Suggested: ${suggestedName}` : ""}
-              />
-            </DialogContent>
-            <DialogActions sx={{ bgcolor: "#f8fafc" }}>
-              <Button
-                onClick={() => {
-                  setAddRemoteDialogOpen(false);
-                  setNewRemoteName("");
-                  setNewRemoteUrl("");
-                }}
-                variant="outlined"
-                sx={{
-                  borderColor: "#d1d5db",
-                  color: "#1e293b",
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  px: 2.5,
-                  py: 1,
-                  background: "#fff",
-                  textTransform: "none",
-                  "&:hover": {
-                    borderColor: "#1e293b",
-                    background: "#f3f3f3",
-                  },
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddRemote}
-                variant="contained"
-                disabled={!newRemoteName || !newRemoteUrl || isAddingRemote}
-                sx={{
-                  background: "#fff", // White background
-                  color: "#111", // Black text (or use "#000")
-                  fontWeight: 700,
-                  fontSize: 16,
-                  borderRadius: 2,
-                  textTransform: "none",
-                  px: 3,
-                  py: 1,
-                  boxShadow: "0 2px 8px #64748b33",
-                  "&:hover": {
-                    background: "#f3f4f6", // Subtle light grey on hover
-                    color: "#111",
-                  },
-                }}
-                startIcon={
-                  isAddingRemote && (
-                    <CircularProgress color="inherit" size={18} />
-                  )
-                }
-              >
-                {isAddingRemote ? "Adding..." : "Create"}
+                Run Selected
+                {checkedSpecs.length > 0 ? ` (${checkedSpecs.length})` : ""}
               </Button>
             </DialogActions>
           </Dialog>
@@ -3473,7 +3457,7 @@ function App() {
                 display: "flex",
                 alignItems: "center",
                 color: "black",
-                fontWeight: 'bold',
+                fontWeight: "bold",
               }}
             >
               Checkout Branch
@@ -3518,57 +3502,56 @@ function App() {
               </Box>
             </DialogContent>
             <DialogActions sx={{ bgcolor: "#fff" }}>
-            <Button
-  onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
-  disabled={isCheckingOut}
-  variant="outlined"
-  sx={{
-    color: "#111",
-    borderColor: "#111",
-    bgcolor: "#fff",
-    fontWeight: 700,
-    borderRadius: 2,
-    minWidth: 120,
-    transform: "none",
-    textTransform: "none",      // <-- Add this line
-    "&:hover": {
-      bgcolor: "#f3f4f6",
-      borderColor: "#111",
-      color: "#111",
-    },
-  }}
->
-  Cancel
-</Button>
+              <Button
+                onClick={() => !isCheckingOut && setCheckoutDialogOpen(false)}
+                disabled={isCheckingOut}
+                variant="outlined"
+                sx={{
+                  color: "#111",
+                  borderColor: "#111",
+                  bgcolor: "#fff",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  minWidth: 120,
+                  transform: "none",
+                  textTransform: "none", // <-- Add this line
+                  "&:hover": {
+                    bgcolor: "#f3f4f6",
+                    borderColor: "#111",
+                    color: "#111",
+                  },
+                }}
+              >
+                Cancel
+              </Button>
 
-<Button
-  variant="outlined"
-  disabled={!checkoutBranchName.trim() || isCheckingOut}
-  onClick={handleCheckoutBranch}
-  startIcon={
-    isCheckingOut ? (
-      <CircularProgress color="inherit" size={18} />
-    ) : null
-  }
-  sx={{
-    color: "#111",
-    borderColor: "#111",
-    bgcolor: "#fff",
-    fontWeight: 700,
-    borderRadius: 2,
-    transform: "none",
-    minWidth: 120,
-    textTransform: "none", // <-- Add this line
-    "&:hover": {
-      bgcolor: "#f3f4f6",
-      borderColor: "#111",
-      color: "#111",
-    },
-  }}
->
-  {isCheckingOut ? "Checking out..." : "Checkout"}
-</Button>
-
+              <Button
+                variant="outlined"
+                disabled={!checkoutBranchName.trim() || isCheckingOut}
+                onClick={handleCheckoutBranch}
+                startIcon={
+                  isCheckingOut ? (
+                    <CircularProgress color="inherit" size={18} />
+                  ) : null
+                }
+                sx={{
+                  color: "#111",
+                  borderColor: "#111",
+                  bgcolor: "#fff",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  transform: "none",
+                  minWidth: 120,
+                  textTransform: "none", // <-- Add this line
+                  "&:hover": {
+                    bgcolor: "#f3f4f6",
+                    borderColor: "#111",
+                    color: "#111",
+                  },
+                }}
+              >
+                {isCheckingOut ? "Checking out..." : "Checkout"}
+              </Button>
             </DialogActions>
           </Dialog>
           <Dialog
